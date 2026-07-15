@@ -1,7 +1,13 @@
+import { setDefaultResultOrder } from "node:dns";
 import { Bot } from "grammy";
 import { env } from "../../config/env.js";
 import { ChatSession } from "../../core/assistant/chatSession.js";
 import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
+
+// En algunos entornos (Windows con IPv6 mal configurado, ciertos sandboxes) la resolución DNS
+// prioriza IPv6 y api.telegram.org queda inalcanzable por esa vía. Forzar IPv4 primero evita
+// timeouts de conexión sin afectar a los entornos donde IPv6 sí funciona.
+setDefaultResultOrder("ipv4first");
 
 if (!env.TELEGRAM_BOT_TOKEN) {
   throw new Error("Falta TELEGRAM_BOT_TOKEN en el .env. Pedíselo a @BotFather en Telegram con /newbot.");

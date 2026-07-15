@@ -6,9 +6,10 @@ const opcional = z.preprocess((v) => (v === "" ? undefined : v), z.string().opti
 
 const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "Falta OPENAI_API_KEY"),
-  // gpt-5.6-terra: buen equilibrio calidad/costo para este caso de uso.
-  // gpt-5.6-luna es más barato (alcanza para consultas simples); gpt-5.6-sol es el tope de gama.
-  OPENAI_MODEL: z.string().default("gpt-5.6-terra"),
+  // gpt-5.4: buen equilibrio calidad/costo, disponible sin verificación adicional de cuenta.
+  // La familia gpt-5.6 (sol/terra/luna) es más nueva pero tiene rollout gateado: aparece
+  // listada en la API pero puede devolver 401 hasta que OpenAI habilite la cuenta/organización.
+  OPENAI_MODEL: z.string().default("gpt-5.4"),
 
   // Conexión directa a Postgres (Supabase → Settings → Database → Transaction pooler, puerto 6543).
   DATABASE_URL: z.string().min(1, "Falta DATABASE_URL"),

@@ -42,6 +42,9 @@ export class ChatSession {
         model: OPENAI_MODEL,
         messages: this.messages,
         tools: toolsParaOpenAI,
+        // gpt-5.6-terra (familia de modelos con razonamiento) exige este parámetro cuando
+        // se usan tools en /v1/chat/completions; sin él, la API devuelve 400.
+        reasoning_effort: "none",
       });
 
       const mensaje = response.choices[0]?.message;

@@ -83,7 +83,9 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 
 ## Sobre el modelo y el costo
 
-Por defecto usa `gpt-5.6-terra` (buen equilibrio calidad/costo). Si necesitás más capacidad, `gpt-5.6-sol` es el tope de gama; para consultas simples y bajar aún más el costo, `gpt-5.6-luna` alcanza. Se cambia con `OPENAI_MODEL` en el `.env`.
+Por defecto usa `gpt-5.4` (buen equilibrio calidad/costo, sin requerir verificación extra de cuenta). Se cambia con `OPENAI_MODEL` en el `.env`.
+
+La familia más nueva `gpt-5.6` (tiers `sol` / `terra` / `luna`) puede devolver **401** aunque tengas crédito cargado: aparece listada en la API pero tiene un rollout gateado — hace falta que OpenAI habilite el acceso a nivel organización (revisá platform.openai.com/settings/organization/general). No es un bug del proyecto.
 
 ## Estructura
 
