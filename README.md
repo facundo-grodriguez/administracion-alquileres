@@ -1,6 +1,6 @@
 # Asistente de administración de alquileres (bot de Telegram)
 
-Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos y cobros. Entiende preguntas en lenguaje natural usando la API de Claude (Anthropic) con tool use, contra una base Postgres (Supabase).
+Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos y cobros. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase).
 
 Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documentación, proveedores, reparaciones, control financiero completo y recordatorios automáticos quedan para fases siguientes (ver abajo).
 
@@ -8,7 +8,7 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 
 - Node.js 18 o superior (recomendado 20+)
 - Una cuenta y proyecto de [Supabase](https://supabase.com) (Postgres)
-- Una API key de [Anthropic](https://console.anthropic.com)
+- Una API key de [OpenAI](https://platform.openai.com/api-keys)
 - Un bot de Telegram (token de [@BotFather](https://t.me/BotFather))
 
 ## Setup
@@ -24,7 +24,7 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 3. En Supabase, copiar la connection string de Postgres: **Settings → Database → Connection string → "Transaction pooler"** (puerto 6543). Reemplazá `[YOUR-PASSWORD]` por la contraseña de tu base. Eso es tu `DATABASE_URL`.
 
 4. Copiar `.env.example` a `.env` y completar:
-   - `ANTHROPIC_API_KEY` (de console.anthropic.com)
+   - `OPENAI_API_KEY` (de platform.openai.com/api-keys)
    - `DATABASE_URL` (la connection string del paso anterior)
    - `TELEGRAM_BOT_TOKEN` (el del paso 2)
    - `TELEGRAM_ALLOWED_USER_IDS` se completa en el paso 7
@@ -83,7 +83,7 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 
 ## Sobre el modelo y el costo
 
-Por defecto usa `claude-opus-4-8` (máxima calidad). Para este caso de uso, `claude-sonnet-5` alcanza de sobra y cuesta bastante menos — si querés bajar costos, poné `CLAUDE_MODEL=claude-sonnet-5` en el `.env`.
+Por defecto usa `gpt-5.6-terra` (buen equilibrio calidad/costo). Si necesitás más capacidad, `gpt-5.6-sol` es el tope de gama; para consultas simples y bajar aún más el costo, `gpt-5.6-luna` alcanza. Se cambia con `OPENAI_MODEL` en el `.env`.
 
 ## Estructura
 
@@ -96,8 +96,9 @@ src/
     services/                   # lógica de negocio (pagos, vencimientos, agenda)
     assistant/
       systemPrompt.ts
-      claudeClient.ts
-      chatSession.ts            # orquesta el Tool Runner de Claude, devuelve el texto de la respuesta
+      openaiClient.ts
+      defineTool.ts              # tipo/helper de tool agnóstico al proveedor de LLM
+      chatSession.ts            # loop de tool-calling con la Chat Completions API de OpenAI
       tools/                    # una tool por archivo + index.ts
   interfaces/
     telegram/index.ts           # bot de Telegram (interfaz principal)

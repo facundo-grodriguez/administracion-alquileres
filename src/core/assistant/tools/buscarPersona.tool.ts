@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as personasRepo from "../../repositories/personas.repository.js";
+import { defineTool } from "../defineTool.js";
 
-export const buscarPersonaTool = betaZodTool({
+export const buscarPersonaTool = defineTool({
   name: "buscar_persona",
   description: "Busca personas (inquilinos, propietarios o garantes) por nombre, DNI o teléfono.",
   inputSchema: z.object({

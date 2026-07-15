@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as personasRepo from "../../repositories/personas.repository.js";
+import { defineTool } from "../defineTool.js";
 
-export const crearPersonaTool = betaZodTool({
+export const crearPersonaTool = defineTool({
   name: "crear_persona",
   description:
     "Da de alta una persona (inquilino, propietario o garante). El rol no se guarda acá: " +

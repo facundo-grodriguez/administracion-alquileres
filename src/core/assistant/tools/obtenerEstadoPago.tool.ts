@@ -1,7 +1,7 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as pagosService from "../../services/pagos.service.js";
 import { formatoARS } from "../../util/formato.js";
+import { defineTool } from "../defineTool.js";
 
 const ESTADO_TEXTO: Record<string, string> = {
   pagado: "PAGADO",
@@ -10,7 +10,7 @@ const ESTADO_TEXTO: Record<string, string> = {
   parcial: "PAGO PARCIAL",
 };
 
-export const obtenerEstadoPagoTool = betaZodTool({
+export const obtenerEstadoPagoTool = defineTool({
   name: "obtener_estado_pago",
   description:
     "Consulta si el alquiler de un inquilino o propiedad está pago para un período dado. " +

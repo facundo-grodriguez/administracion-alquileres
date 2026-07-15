@@ -5,8 +5,10 @@ import { z } from "zod";
 const opcional = z.preprocess((v) => (v === "" ? undefined : v), z.string().optional());
 
 const envSchema = z.object({
-  ANTHROPIC_API_KEY: z.string().min(1, "Falta ANTHROPIC_API_KEY"),
-  CLAUDE_MODEL: z.string().default("claude-opus-4-8"),
+  OPENAI_API_KEY: z.string().min(1, "Falta OPENAI_API_KEY"),
+  // gpt-5.6-terra: buen equilibrio calidad/costo para este caso de uso.
+  // gpt-5.6-luna es más barato (alcanza para consultas simples); gpt-5.6-sol es el tope de gama.
+  OPENAI_MODEL: z.string().default("gpt-5.6-terra"),
 
   // Conexión directa a Postgres (Supabase → Settings → Database → Transaction pooler, puerto 6543).
   DATABASE_URL: z.string().min(1, "Falta DATABASE_URL"),

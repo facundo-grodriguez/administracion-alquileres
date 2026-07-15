@@ -1,9 +1,9 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as pagosService from "../../services/pagos.service.js";
 import { formatoARS } from "../../util/formato.js";
+import { defineTool } from "../defineTool.js";
 
-export const crearReciboTool = betaZodTool({
+export const crearReciboTool = defineTool({
   name: "crear_recibo",
   description:
     "Registra el pago de un período de alquiler (marca el período como pagado). Requiere el ID del contrato.",

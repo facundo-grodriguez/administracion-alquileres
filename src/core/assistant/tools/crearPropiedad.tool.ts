@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import { defineTool } from "../defineTool.js";
 
-export const crearPropiedadTool = betaZodTool({
+export const crearPropiedadTool = defineTool({
   name: "crear_propiedad",
   description:
     "Da de alta una propiedad. Requiere el ID del propietario (usar buscar_persona o crear_persona primero).",

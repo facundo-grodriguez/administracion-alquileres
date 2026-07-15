@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import { defineTool } from "../defineTool.js";
 
-export const buscarPropiedadTool = betaZodTool({
+export const buscarPropiedadTool = defineTool({
   name: "buscar_propiedad",
   description:
     "Busca propiedades por dirección, zona, nombre del propietario o del inquilino actual. " +

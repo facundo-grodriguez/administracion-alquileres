@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as vencimientosService from "../../services/vencimientos.service.js";
+import { defineTool } from "../defineTool.js";
 
-export const listarVencimientosTool = betaZodTool({
+export const listarVencimientosTool = defineTool({
   name: "listar_vencimientos",
   description:
     "Lista los contratos vigentes cuyo vencimiento cae dentro de un rango de fechas. " +

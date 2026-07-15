@@ -1,8 +1,8 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as contratosRepo from "../../repositories/contratos.repository.js";
+import { defineTool } from "../defineTool.js";
 
-export const crearContratoTool = betaZodTool({
+export const crearContratoTool = defineTool({
   name: "crear_contrato",
   description:
     "Da de alta un contrato de alquiler. Requiere IDs de propiedad e inquilino ya existentes " +
