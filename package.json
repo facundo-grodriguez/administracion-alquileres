@@ -14,7 +14,7 @@
     "format": "biome format --write ."
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.3",
@@ -22,7 +22,7 @@
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.5",

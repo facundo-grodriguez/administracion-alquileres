@@ -6,7 +6,7 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 
 ## Requisitos
 
-- Node.js 18 o superior (recomendado 20+)
+- Node.js 22 o superior (probado con 24 LTS)
 - Una cuenta y proyecto de [Supabase](https://supabase.com) (Postgres)
 - Una API key de [OpenAI](https://platform.openai.com/api-keys)
 - Un bot de Telegram (token de [@BotFather](https://t.me/BotFather))
