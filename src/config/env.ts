@@ -1,0 +1,42 @@
+import "dotenv/config";
+import { z } from "zod";
+
+// Trata las cadenas vacías como ausentes (para campos opcionales seteados en "" en el .env).
+const opcional = z.preprocess((v) => (v === "" ? undefined : v), z.string().optional());
+
+const envSchema = z.object({
+  ANTHROPIC_API_KEY: z.string().min(1, "Falta ANTHROPIC_API_KEY"),
+  CLAUDE_MODEL: z.string().default("claude-opus-4-8"),
+
+  // Conexión directa a Postgres (Supabase → Settings → Database → Transaction pooler, puerto 6543).
+  DATABASE_URL: z.string().min(1, "Falta DATABASE_URL"),
+
+  // Telegram (opcional acá; la interfaz del bot valida que TELEGRAM_BOT_TOKEN exista al arrancar).
+  TELEGRAM_BOT_TOKEN: opcional,
+  TELEGRAM_ALLOWED_USER_IDS: z
+    .string()
+    .default("")
+    .transform((s) =>
+      s
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter((n) => Number.isInteger(n)),
+    ),
+
+  // Supabase Storage: solo para documentos/fotos (fase 2). No se usa en el v1.
+  SUPABASE_URL: opcional,
+  SUPABASE_SERVICE_ROLE_KEY: opcional,
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const detalle = parsed.error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`).join("\n");
+  throw new Error(
+    `Variables de entorno inválidas o faltantes:\n${detalle}\n\nRevisá tu archivo .env (basado en .env.example).`,
+  );
+}
+
+export const env = parsed.data;
