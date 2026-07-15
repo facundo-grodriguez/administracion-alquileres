@@ -11,13 +11,6 @@ export async function crearPropiedad(datos: NuevaPropiedad): Promise<Propiedad> 
   return filas[0]!;
 }
 
-export async function buscarPropiedadPorId(id: string): Promise<PropiedadConPropietario | undefined> {
-  return db.query.propiedades.findFirst({
-    where: eq(propiedades.id, id),
-    with: { propietario: true },
-  }) as Promise<PropiedadConPropietario | undefined>;
-}
-
 export async function buscarPropiedades(query: string): Promise<PropiedadConPropietario[]> {
   const patron = `%${query}%`;
 

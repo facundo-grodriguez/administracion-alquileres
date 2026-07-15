@@ -39,6 +39,13 @@ const envSchema = z.object({
   // Supabase Storage: solo para documentos/fotos (fase 2). No se usa en el v1.
   SUPABASE_URL: opcional,
   SUPABASE_SERVICE_ROLE_KEY: opcional,
+
+  // Activa el log de uso/costo de cada llamada a OpenAI (tokens de entrada/salida/total + costo
+  // estimado) por consola. Pensado para desarrollo, no para producción (es ruidoso).
+  DEBUG_AI: z
+    .string()
+    .default("false")
+    .transform((s) => s.toLowerCase() === "true"),
 });
 
 const parsed = envSchema.safeParse(process.env);

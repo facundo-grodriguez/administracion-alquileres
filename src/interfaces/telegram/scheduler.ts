@@ -24,17 +24,21 @@ export async function enviarDigestDiario(bot: Bot, destinos: number[], opciones?
   const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
   const texto = formatearResumenAgenda(resumen);
 
+  let algunEnvioExitoso = false;
   for (const chatId of destinos) {
     try {
       for (const parte of dividirMensaje(texto)) {
         await bot.api.sendMessage(chatId, parte);
       }
+      algunEnvioExitoso = true;
     } catch (error) {
       console.error(`No pude enviar el recordatorio a ${chatId}:`, error);
     }
   }
 
-  if (!forzar) {
+  // Solo marca el día como notificado si al menos un envío funcionó; si todos fallaron
+  // (ej. Telegram caído en ese momento), se reintenta al día siguiente en vez de perderse.
+  if (!forzar && algunEnvioExitoso) {
     await recordatoriosRepo.registrarEnvio(TIPO_DIGEST, hoy);
   }
 }

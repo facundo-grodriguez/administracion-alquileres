@@ -101,7 +101,9 @@ export async function crearRecibo(input: {
   const existente = await pagosRepo.buscarPagoPorContratoYPeriodo(input.contratoId, periodoDate);
 
   if (existente) {
-    return pagosRepo.registrarPagoRecibido(existente.id, input.fechaPago, input.medioPago);
+    // Si ya había una fila para este período (ej: se está corrigiendo un pago cargado antes),
+    // actualiza también el monto — antes quedaba pisado en silencio con el valor viejo.
+    return pagosRepo.registrarPagoRecibido(existente.id, input.fechaPago, input.monto, input.medioPago);
   }
 
   const contrato = await contratosRepo.buscarContratoPorId(input.contratoId);
@@ -120,39 +122,15 @@ export async function crearRecibo(input: {
   });
 }
 
-export type AlquilerAtrasado = {
+export type CobroDelMes = {
   contratoId: string;
   inquilino: string;
   propiedad: string;
   periodo: string;
   fechaVencimiento: string;
   monto: string;
+  estado: EstadoPago;
 };
-
-/** Alquileres atrasados del período actual entre los contratos vigentes (no reconstruye historial de meses anteriores). */
-export async function listarAtrasados(): Promise<AlquilerAtrasado[]> {
-  const contratosVigentes = await contratosRepo.listarContratosVigentes();
-  const periodoActual = hoyISO().slice(0, 7);
-
-  const resultados = await Promise.all(
-    contratosVigentes.map(async (contrato) => {
-      const estadoPeriodo = await estadoPeriodoParaContrato(contrato, periodoActual);
-      if (estadoPeriodo.estado !== "atrasado") return null;
-      return {
-        contratoId: contrato.id,
-        inquilino: contrato.inquilino.nombreCompleto,
-        propiedad: contrato.propiedad.direccion,
-        periodo: periodoActual,
-        fechaVencimiento: estadoPeriodo.fechaVencimiento,
-        monto: estadoPeriodo.monto,
-      };
-    }),
-  );
-
-  return resultados.filter((r): r is AlquilerAtrasado => r !== null);
-}
-
-export type CobroDelMes = AlquilerAtrasado & { estado: EstadoPago };
 
 /** Todo lo que corresponde cobrar en el período actual entre los contratos vigentes. */
 export async function resumenCobrosDelMes(): Promise<CobroDelMes[]> {

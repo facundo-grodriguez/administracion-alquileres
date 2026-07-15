@@ -6,6 +6,7 @@ import type { ToolDefinition } from "./defineTool.js";
 import { OPENAI_MODEL, openai } from "./openaiClient.js";
 import { SYSTEM_PROMPT } from "./systemPrompt.js";
 import { tools } from "./tools/index.js";
+import { logUsoOpenAI } from "./usageLogger.js";
 
 const MAX_ITERACIONES_TOOLS = 8;
 
@@ -42,10 +43,18 @@ export class ChatSession {
         model: OPENAI_MODEL,
         messages: this.messages,
         tools: toolsParaOpenAI,
-        // gpt-5.6-terra (familia de modelos con razonamiento) exige este parámetro cuando
+        // gpt-5.4/gpt-5.6 (familia de modelos con razonamiento) exige este parámetro cuando
         // se usan tools en /v1/chat/completions; sin él, la API devuelve 400.
         reasoning_effort: "none",
+        // Respuestas cortas y consistentes: este es un asistente de datos (busca/confirma/lista),
+        // no necesita creatividad ni respuestas largas. `max_tokens` está deprecado y además
+        // rechazado (400) por esta familia de modelos "reasoning" — el nombre vigente es
+        // `max_completion_tokens` (ver node_modules/openai/resources/chat/completions/completions.d.ts).
+        max_completion_tokens: 400,
+        temperature: 0.2,
       });
+
+      logUsoOpenAI(response.usage, OPENAI_MODEL, `turno ${iteracion + 1}`);
 
       const mensaje = response.choices[0]?.message;
       if (!mensaje) return "(No obtuve respuesta del modelo.)";
