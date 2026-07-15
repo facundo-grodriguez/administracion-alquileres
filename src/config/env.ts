@@ -28,6 +28,14 @@ const envSchema = z.object({
         .filter((n) => Number.isInteger(n)),
     ),
 
+  // Recordatorio diario (digest). El scheduler del bot manda una vez por día el resumen de la agenda.
+  AGENDA_HORA: z
+    .string()
+    .default("09:00")
+    .refine((s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s), "AGENDA_HORA debe tener formato HH:MM (24hs)"),
+  AGENDA_TIMEZONE: z.string().default("America/Argentina/Buenos_Aires"),
+  AGENDA_DIAS_ANTICIPACION: z.coerce.number().int().positive().default(30),
+
   // Supabase Storage: solo para documentos/fotos (fase 2). No se usa en el v1.
   SUPABASE_URL: opcional,
   SUPABASE_SERVICE_ROLE_KEY: opcional,

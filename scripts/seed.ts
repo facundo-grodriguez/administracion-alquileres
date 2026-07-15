@@ -1,6 +1,15 @@
 import "dotenv/config";
 import { db } from "../src/core/db/client.js";
-import { contratos, contratosGarantes, pagos, personas, propiedades } from "../src/core/db/schema.js";
+import {
+  contratos,
+  contratosGarantes,
+  impuestosServicios,
+  pagos,
+  personas,
+  propiedades,
+  reparaciones,
+  seguros,
+} from "../src/core/db/schema.js";
 import { hoyISO, sumarDiasISO } from "../src/core/util/fecha.js";
 
 function unico<T>(filas: T[]): T {
@@ -123,6 +132,35 @@ async function seed() {
     estado: "vigente",
   });
   // Este contrato vence en 15 días → aparece en listar_vencimientos / el resumen de agenda.
+
+  // Seguro por vencer en 20 días → aparece en la agenda y en "¿qué seguros tengo que renovar?".
+  await db.insert(seguros).values({
+    propiedadId: propiedadCaseros.id,
+    compania: "La Caja",
+    numeroPoliza: "POL-99887",
+    fechaInicio: sumarDiasISO(hoy, -345),
+    fechaVencimiento: sumarDiasISO(hoy, 20),
+    costo: "45000",
+  });
+
+  // ABL por vencer en 8 días → aparece en la agenda / impuestos por vencer.
+  await db.insert(impuestosServicios).values({
+    propiedadId: propiedadPalermo.id,
+    tipo: "ABL",
+    numeroCuenta: "123-456789-0",
+    fechaVencimiento: sumarDiasISO(hoy, 8),
+    periodicidad: "bimestral",
+    montoEstimado: "32000",
+  });
+
+  // Reparación abierta → aparece en la agenda / "¿qué reparaciones tengo abiertas?".
+  await db.insert(reparaciones).values({
+    propiedadId: propiedadBelgrano.id,
+    fecha: sumarDiasISO(hoy, -3),
+    descripcion: "Pérdida de agua en el baño",
+    costo: "80000",
+    estado: "pendiente",
+  });
 
   console.log("Listo. Datos de prueba cargados:");
   console.log(`  Propietario: ${propietario.nombreCompleto}`);

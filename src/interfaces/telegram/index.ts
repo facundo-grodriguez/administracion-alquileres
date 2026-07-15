@@ -3,6 +3,8 @@ import { Bot } from "grammy";
 import { env } from "../../config/env.js";
 import { ChatSession } from "../../core/assistant/chatSession.js";
 import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
+import { enviarDigestDiario, iniciarSchedulerAgenda } from "./scheduler.js";
+import { dividirMensaje } from "./util.js";
 
 // En algunos entornos (Windows con IPv6 mal configurado, ciertos sandboxes) la resolución DNS
 // prioriza IPv6 y api.telegram.org queda inalcanzable por esa vía. Forzar IPv4 primero evita
@@ -30,12 +32,13 @@ function sesionDe(chatId: number): ChatSession {
 
 const AYUDA = [
   "Soy el asistente de administración de alquileres. Escribime lo que necesites, por ejemplo:",
+  "• ¿Qué tengo pendiente hoy?",
   "• ¿Está pago el alquiler de Juan?",
-  "• ¿Qué contratos vencen este mes?",
-  "• ¿Qué alquileres están atrasados?",
+  "• ¿Qué seguros tengo que renovar?",
+  "• Cargá un seguro de La Caja para [propiedad] que vence el 30/08",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
-  "Comandos: /agenda (vencimientos y atrasos), /reset (empezar de nuevo), /ayuda",
+  "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /reset, /ayuda",
 ].join("\n");
 
 // Control de acceso: un bot de Telegram es público. Solo responden los IDs autorizados;
@@ -64,11 +67,24 @@ bot.command("reset", (ctx) => {
 bot.command("agenda", async (ctx) => {
   await ctx.replyWithChatAction("typing");
   try {
-    const resumen = await obtenerResumenAgenda();
-    await ctx.reply(formatearResumenAgenda(resumen));
+    const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
+    for (const parte of dividirMensaje(formatearResumenAgenda(resumen))) {
+      await ctx.reply(parte);
+    }
   } catch (error) {
     console.error("Error al obtener la agenda:", error);
     await ctx.reply("No pude leer la agenda. Revisá la conexión a la base de datos.");
+  }
+});
+
+// Dispara el recordatorio diario en el momento (hacia quien lo pide), para probar el push.
+bot.command("enviar_agenda", async (ctx) => {
+  await ctx.replyWithChatAction("typing");
+  try {
+    await enviarDigestDiario(bot, [ctx.chat.id], { forzar: true });
+  } catch (error) {
+    console.error("Error al enviar el recordatorio:", error);
+    await ctx.reply("No pude enviar el recordatorio.");
   }
 });
 
@@ -90,27 +106,15 @@ bot.on("message:text", async (ctx) => {
 
 bot.catch((err) => console.error("Error no capturado del bot:", err.error));
 
-/** Telegram limita los mensajes a 4096 caracteres; partimos respuestas largas por saltos de línea. */
-function dividirMensaje(texto: string, max = 4000): string[] {
-  if (texto.length <= max) return [texto];
-  const partes: string[] = [];
-  let resto = texto;
-  while (resto.length > max) {
-    let corte = resto.lastIndexOf("\n", max);
-    if (corte < max * 0.5) corte = max;
-    partes.push(resto.slice(0, corte));
-    resto = resto.slice(corte);
-  }
-  if (resto.length > 0) partes.push(resto);
-  return partes;
-}
-
 console.log("Bot de Telegram iniciado. Esperando mensajes... (Ctrl+C para detener)");
 if (autorizados.size === 0) {
   console.warn(
     "Aviso: TELEGRAM_ALLOWED_USER_IDS está vacío, así que nadie está autorizado todavía. " +
       "Mandale un mensaje al bot para ver tu ID y agregalo al .env.",
   );
+} else {
+  // El recordatorio diario se manda a los IDs autorizados (en chats privados, chat_id == user_id).
+  iniciarSchedulerAgenda(bot, [...autorizados]);
 }
 
 bot.start();

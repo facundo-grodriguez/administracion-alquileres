@@ -57,16 +57,25 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 
 ### Preguntas de ejemplo (con los datos de `npm run seed`)
 
+- "¿Qué tengo pendiente hoy?"
 - "¿Está pago el alquiler de Juan?"
 - "¿Qué alquileres están atrasados?"
-- "¿Qué contratos vencen este mes?"
+- "¿Qué seguros tengo que renovar?"
+- "¿Qué vence esta semana?"
+- "¿Qué reparaciones tengo abiertas?"
+- "Cargá un seguro de La Caja para [propiedad] que vence el 30/08"
 - "Dá de alta a Pedro Fernández como nueva persona, DNI 32111222"
 
 ### Comandos del bot
 
-- `/agenda` — resumen de vencimientos próximos y alquileres atrasados
+- `/agenda` — resumen completo: alquileres a cobrar, vencimientos próximos (contratos, seguros, impuestos/servicios) y reparaciones abiertas
+- `/enviar_agenda` — dispara el recordatorio diario en el momento (para probarlo)
 - `/reset` — empezar una conversación nueva (borra el historial de esa charla)
 - `/ayuda` — ayuda
+
+### Recordatorio diario automático
+
+El bot manda una vez por día (por defecto 09:00, hora Argentina) el resumen de la agenda a los IDs autorizados. Se configura con `AGENDA_HORA`, `AGENDA_TIMEZONE` y `AGENDA_DIAS_ANTICIPACION` en el `.env`. **Requiere que el bot esté prendido a esa hora** — para que llegue siempre, hay que desplegarlo 24/7 (etapa siguiente).
 
 ## Scripts
 
