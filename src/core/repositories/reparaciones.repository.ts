@@ -5,11 +5,20 @@ import { reparaciones } from "../db/schema.js";
 export type Reparacion = typeof reparaciones.$inferSelect;
 export type NuevaReparacion = typeof reparaciones.$inferInsert;
 
-const conRelaciones = { propiedad: true, proveedor: true } as const;
+const conRelaciones = { propiedad: true, proveedor: true, comprobante: true } as const;
 
 export async function crearReparacion(datos: NuevaReparacion): Promise<Reparacion> {
   const filas = await db.insert(reparaciones).values(datos).returning();
   return filas[0]!;
+}
+
+export async function adjuntarComprobante(reparacionId: string, documentoId: string): Promise<Reparacion | undefined> {
+  const filas = await db
+    .update(reparaciones)
+    .set({ comprobanteDocumentoId: documentoId })
+    .where(eq(reparaciones.id, reparacionId))
+    .returning();
+  return filas[0];
 }
 
 /** Reparaciones no terminadas (estado ≠ completada). */

@@ -30,6 +30,7 @@ export const tipoDocumentoEnum = pgEnum("tipo_documento", [
   "factura",
   "comprobante",
   "foto",
+  "inventario",
   "otro",
 ]);
 export const tipoImpuestoServicioEnum = pgEnum("tipo_impuesto_servicio", [
@@ -39,9 +40,11 @@ export const tipoImpuestoServicioEnum = pgEnum("tipo_impuesto_servicio", [
   "gas",
   "agua",
   "expensas",
+  "internet",
   "otro",
 ]);
 export const tipoMovimientoFinancieroEnum = pgEnum("tipo_movimiento_financiero", ["ingreso", "gasto"]);
+export const responsablePagoEnum = pgEnum("responsable_pago", ["propietario", "inquilino"]);
 
 // personas: inquilinos, propietarios, garantes y administradores. El rol no es un campo fijo:
 // se infiere de dónde se referencia a la persona (propietarioId de una propiedad, inquilinoId
@@ -99,6 +102,7 @@ export const propiedades = pgTable("propiedades", {
   tipo: varchar("tipo", { length: 60 }),
   medidores: jsonb("medidores"),
   observaciones: text("observaciones"),
+  carpetaDriveUrl: text("carpeta_drive_url"),
   ...timestamps,
 });
 
@@ -197,6 +201,7 @@ export const impuestosServicios = pgTable(
       .notNull()
       .references(() => propiedades.id, { onDelete: "cascade" }),
     tipo: tipoImpuestoServicioEnum("tipo").notNull(),
+    responsable: responsablePagoEnum("responsable"),
     numeroCuenta: varchar("numero_cuenta", { length: 80 }),
     fechaVencimiento: date("fecha_vencimiento").notNull(),
     periodicidad: varchar("periodicidad", { length: 40 }),

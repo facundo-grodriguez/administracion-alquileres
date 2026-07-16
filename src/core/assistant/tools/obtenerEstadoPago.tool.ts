@@ -31,6 +31,7 @@ export const obtenerEstadoPagoTool = defineTool({
         return `${resultado.nombre} no tiene un contrato vigente actualmente.`;
       case "resuelto":
         return [
+          `Contrato ID: ${resultado.contratoId}`,
           `Inquilino: ${resultado.inquilino}`,
           `Propiedad: ${resultado.propiedad}`,
           `Período: ${resultado.periodo}`,

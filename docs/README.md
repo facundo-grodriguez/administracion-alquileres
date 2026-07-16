@@ -2,10 +2,13 @@
 
 Historial de las etapas de desarrollo del asistente de administración de alquileres. Cada etapa tiene su propio documento con qué se construyó, decisiones tomadas y estado.
 
+Para la vista completa por versión (qué está hecho y qué falta, todo junto) ver **[roadmap.md](roadmap.md)**.
+
 | Etapa | Documento | Estado |
 |---|---|---|
 | 1 | [MVP — bot conversacional](etapa-1-mvp.md) | ✅ Completada |
 | 2 | [Agenda unificada y recordatorios proactivos](etapa-2-agenda-recordatorios.md) | ✅ Completada |
+| 3 | [Proveedores, documentación, obligaciones ampliadas y financiero](etapa-3-proveedores-documentacion-financiero.md) | ✅ Completada |
 
 ## Convención
 

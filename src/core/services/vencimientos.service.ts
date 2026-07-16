@@ -68,7 +68,7 @@ export async function listarVencimientos(
         tipo: "impuesto_servicio",
         entidadId: i.id,
         propiedad: i.propiedad.direccion,
-        descripcion: i.tipo,
+        descripcion: `${i.tipo}${i.responsable ? ` (responsable: ${i.responsable})` : ""}`,
         fechaVencimiento: i.fechaVencimiento,
         diasRestantes: diasEntreISO(hoy, i.fechaVencimiento),
         monto: i.montoEstimado,

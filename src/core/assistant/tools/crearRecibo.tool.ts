@@ -6,7 +6,10 @@ import { defineTool } from "../defineTool.js";
 export const crearReciboTool = defineTool({
   name: "crear_recibo",
   description:
-    "Registra el pago de un período de alquiler (marca el período como pagado). Requiere el ID del contrato.",
+    "Registra el pago de un período de alquiler (marca el período como pagado). Requiere el ID del contrato " +
+    "(usar obtener_estado_pago primero para resolverlo a partir del nombre del inquilino o la propiedad). " +
+    "Si el período ya tenía un pago registrado, llamarla de nuevo CORRIGE ese pago (monto, fecha, medio de pago) " +
+    "en vez de duplicarlo — usarla también para corregir un monto mal cargado.",
   inputSchema: z.object({
     contrato_id: z.string(),
     periodo: z.string().describe("Mes/año en formato YYYY-MM"),

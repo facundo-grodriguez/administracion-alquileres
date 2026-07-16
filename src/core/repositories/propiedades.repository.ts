@@ -11,6 +11,15 @@ export async function crearPropiedad(datos: NuevaPropiedad): Promise<Propiedad> 
   return filas[0]!;
 }
 
+export async function obtenerPropiedadPorId(id: string): Promise<Propiedad | undefined> {
+  return db.query.propiedades.findFirst({ where: eq(propiedades.id, id) });
+}
+
+export async function actualizarCarpetaDrive(id: string, url: string): Promise<Propiedad | undefined> {
+  const filas = await db.update(propiedades).set({ carpetaDriveUrl: url }).where(eq(propiedades.id, id)).returning();
+  return filas[0];
+}
+
 export async function buscarPropiedades(query: string): Promise<PropiedadConPropietario[]> {
   const patron = `%${query}%`;
 

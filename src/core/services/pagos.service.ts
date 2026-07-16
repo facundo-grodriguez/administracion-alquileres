@@ -1,4 +1,5 @@
 import * as contratosRepo from "../repositories/contratos.repository.js";
+import * as movimientosRepo from "../repositories/movimientosFinancieros.repository.js";
 import * as pagosRepo from "../repositories/pagos.repository.js";
 import * as personasRepo from "../repositories/personas.repository.js";
 import * as propiedadesRepo from "../repositories/propiedades.repository.js";
@@ -97,29 +98,44 @@ export async function crearRecibo(input: {
   fechaPago: string;
   medioPago?: string;
 }) {
-  const periodoDate = `${input.periodo}-01`;
-  const existente = await pagosRepo.buscarPagoPorContratoYPeriodo(input.contratoId, periodoDate);
-
-  if (existente) {
-    // Si ya había una fila para este período (ej: se está corrigiendo un pago cargado antes),
-    // actualiza también el monto — antes quedaba pisado en silencio con el valor viejo.
-    return pagosRepo.registrarPagoRecibido(existente.id, input.fechaPago, input.monto, input.medioPago);
-  }
-
   const contrato = await contratosRepo.buscarContratoPorId(input.contratoId);
   if (!contrato) throw new Error(`No existe el contrato ${input.contratoId}`);
 
-  const fechaVencimiento = `${input.periodo}-${String(contrato.diaVencimientoPago).padStart(2, "0")}`;
+  const periodoDate = `${input.periodo}-01`;
+  const existente = await pagosRepo.buscarPagoPorContratoYPeriodo(input.contratoId, periodoDate);
 
-  return pagosRepo.crearPago({
-    contratoId: input.contratoId,
-    periodo: periodoDate,
-    monto: input.monto,
-    fechaVencimiento,
-    fechaPago: input.fechaPago,
-    estado: "pagado",
-    medioPago: input.medioPago,
-  });
+  const pago = existente
+    ? // Si ya había una fila para este período (ej: se está corrigiendo un pago cargado antes),
+      // actualiza también el monto — antes quedaba pisado en silencio con el valor viejo.
+      await pagosRepo.registrarPagoRecibido(existente.id, input.fechaPago, input.monto, input.medioPago)
+    : await pagosRepo.crearPago({
+        contratoId: input.contratoId,
+        periodo: periodoDate,
+        monto: input.monto,
+        fechaVencimiento: `${input.periodo}-${String(contrato.diaVencimientoPago).padStart(2, "0")}`,
+        fechaPago: input.fechaPago,
+        estado: "pagado",
+        medioPago: input.medioPago,
+      });
+
+  if (pago?.fechaPago) {
+    try {
+      await movimientosRepo.upsertPorReferencia({
+        propiedadId: contrato.propiedadId,
+        tipo: "ingreso",
+        categoria: "alquiler",
+        monto: pago.monto,
+        fecha: pago.fechaPago,
+        referenciaTipo: "pago",
+        referenciaId: pago.id,
+        descripcion: `Alquiler ${input.periodo} — ${contrato.inquilino.nombreCompleto}`,
+      });
+    } catch (error) {
+      console.error("No se pudo registrar el movimiento financiero del pago:", error);
+    }
+  }
+
+  return pago;
 }
 
 export type CobroDelMes = {

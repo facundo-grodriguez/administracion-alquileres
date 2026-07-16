@@ -22,7 +22,9 @@ export const listarReparacionesTool = defineTool({
     return reparaciones
       .map((r) => {
         const costo = r.costo ? ` — ${formatoARS(r.costo)}` : "";
-        return `- [${r.id}] ${r.descripcion} — ${r.propiedad.direccion} — ${r.estado} (${r.fecha})${costo}`;
+        const proveedor = r.proveedor ? ` — proveedor: ${r.proveedor.nombre}` : "";
+        const comprobante = r.comprobante ? " 📎" : "";
+        return `- [${r.id}] ${r.descripcion} — ${r.propiedad.direccion} — ${r.estado} (${r.fecha})${costo}${proveedor}${comprobante}`;
       })
       .join("\n");
   },

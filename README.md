@@ -1,8 +1,8 @@
 # Asistente de administración de alquileres (bot de Telegram)
 
-Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos y cobros. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase).
+Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos, cobros, seguros, impuestos/servicios, reparaciones (con proveedor asignado), documentación (links a Google Drive) y control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documentación, proveedores, reparaciones, control financiero completo y recordatorios automáticos quedan para fases siguientes (ver abajo).
+**Versión actual: v3** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — deploy 24/7, edición/borrado de datos, subida real de archivos, entre otros).
 
 ## Requisitos
 
@@ -65,6 +65,12 @@ Este es el **v1 / MVP**: cubre personas, propiedades, contratos y pagos. Documen
 - "¿Qué reparaciones tengo abiertas?"
 - "Cargá un seguro de La Caja para [propiedad] que vence el 30/08"
 - "Dá de alta a Pedro Fernández como nueva persona, DNI 32111222"
+- "Cargá una reparación en [propiedad]: se rompió tal cosa, la hace [proveedor], costo 50000"
+- "Buscame un plomero en [zona]"
+- "¿Quién paga el internet de [propiedad], el propietario o el inquilino?"
+- "Vinculá la carpeta de Drive de [propiedad]: [link]"
+- "Mostrame la documentación de [propiedad]"
+- "¿Cómo viene el balance de [propiedad] este mes?"
 
 ### Comandos del bot
 
@@ -104,7 +110,7 @@ src/
   core/
     db/                        # schema Drizzle, cliente de DB, cliente de Storage (fase 2)
     repositories/               # acceso tipado a cada tabla
-    services/                   # lógica de negocio (pagos, vencimientos, agenda)
+    services/                   # lógica de negocio (pagos, vencimientos, agenda, reparaciones, movimientos financieros)
     assistant/
       systemPrompt.ts
       openaiClient.ts
@@ -125,11 +131,21 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 - El bot solo responde a los IDs listados en `TELEGRAM_ALLOWED_USER_IDS`. A cualquier otro le contesta que no está autorizado (y le muestra su ID, para que puedas agregarlo si corresponde).
 - El `.env` está en `.gitignore`: nunca lo subas al repo.
 
-## Próximas fases (fuera de este v1)
+## Historial de versiones
 
-- Documentación digital: subida real de contratos/pólizas/comprobantes a Supabase Storage.
-- Base de datos de proveedores y su vínculo con reparaciones.
-- Historial de reparaciones.
-- Control financiero completo (ingresos/gastos/resultado neto por propiedad).
-- Recordatorios automáticos push (recordar vencimientos por Telegram sin que preguntes), vía un job programado.
+- **v1 — MVP**: personas, propiedades, contratos, pagos.
+- **v2 — Agenda y recordatorios**: seguros, impuestos/servicios, reparaciones, agenda unificada, recordatorio diario proactivo.
+- **v3 — Proveedores, documentación y financiero** *(actual)*: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
+
+Detalle completo de cada etapa en [`docs/`](docs/README.md).
+
+## Próximas fases
+
+- **Deploy 24/7** (Railway u otro) para que el recordatorio diario llegue aunque el bot no esté corriendo local — es lo más importante que falta.
+- Edición y borrado de propiedades, personas, proveedores y contratos (hoy solo alta y consulta).
+- Documentación digital: subida real de archivos a Supabase Storage (hoy son links a Google Drive).
+- Que seguros e impuestos/servicios alimenten el balance financiero cuando se marcan como pagados.
+- Recordatorios por-evento escalados (varios avisos con urgencia creciente, no solo el digest diario).
 - Interfaz web, reutilizando `src/core` sin cambios.
+
+Ver [docs/roadmap.md](docs/roadmap.md) para el detalle de por qué cada una todavía no se hizo.

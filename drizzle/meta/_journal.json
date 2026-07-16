@@ -8,6 +8,13 @@
       "when": 1784083503882,
       "tag": "0000_greedy_kate_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784163532857,
+      "tag": "0001_premium_swordsman",
+      "breakpoints": true
     }
   ]
 }
