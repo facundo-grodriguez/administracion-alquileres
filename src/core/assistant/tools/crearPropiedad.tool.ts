@@ -1,4 +1,5 @@
 import { z } from "zod";
+import * as personasRepo from "../../repositories/personas.repository.js";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import { defineTool } from "../defineTool.js";
 
@@ -21,6 +22,16 @@ export const crearPropiedadTool = defineTool({
       tipo: input.tipo,
       observaciones: input.observaciones,
     });
-    return `Propiedad creada: [${propiedad.id}] ${propiedad.direccion}`;
+    const propietario = await personasRepo.obtenerPersonaPorId(input.propietario_id);
+    return [
+      "Propiedad registrada.",
+      `Dirección: ${propiedad.direccion}`,
+      propiedad.zona ? `Zona: ${propiedad.zona}` : null,
+      propiedad.tipo ? `Tipo: ${propiedad.tipo}` : null,
+      propietario ? `Propietario: ${propietario.nombreCompleto}` : null,
+      `(id: ${propiedad.id})`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

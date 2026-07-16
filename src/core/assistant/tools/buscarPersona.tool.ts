@@ -15,7 +15,7 @@ export const buscarPersonaTool = defineTool({
     return personas
       .map(
         (p) =>
-          `- [${p.id}] ${p.nombreCompleto}${p.dni ? ` (DNI ${p.dni})` : ""}${p.telefono ? ` — tel: ${p.telefono}` : ""}`,
+          `- ${p.nombreCompleto}${p.dni ? ` (DNI ${p.dni})` : ""}${p.telefono ? ` — tel: ${p.telefono}` : ""} (id: ${p.id})`,
       )
       .join("\n");
   },

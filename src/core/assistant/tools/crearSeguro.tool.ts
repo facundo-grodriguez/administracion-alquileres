@@ -1,5 +1,8 @@
 import { z } from "zod";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import * as segurosRepo from "../../repositories/seguros.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
+import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearSeguroTool = defineTool({
@@ -24,6 +27,16 @@ export const crearSeguroTool = defineTool({
       costo: input.costo,
       observaciones: input.observaciones,
     });
-    return `Seguro registrado: [${seguro.id}] ${seguro.compania}, vence ${seguro.fechaVencimiento}.`;
+    const propiedad = await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id);
+    return [
+      "Seguro registrado.",
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      `Compañía: ${seguro.compania}`,
+      seguro.numeroPoliza ? `Póliza: ${seguro.numeroPoliza}` : null,
+      `Vencimiento: ${formatoFechaAR(seguro.fechaVencimiento)}`,
+      seguro.costo ? `Costo: ${formatoARS(seguro.costo)}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as pagosService from "../../services/pagos.service.js";
+import { formatoFechaAR, formatoPeriodoAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -31,14 +32,14 @@ export const obtenerEstadoPagoTool = defineTool({
         return `${resultado.nombre} no tiene un contrato vigente actualmente.`;
       case "resuelto":
         return [
-          `Contrato ID: ${resultado.contratoId}`,
           `Inquilino: ${resultado.inquilino}`,
           `Propiedad: ${resultado.propiedad}`,
-          `Período: ${resultado.periodo}`,
+          `Período: ${formatoPeriodoAR(resultado.periodo)}`,
           `Estado: ${ESTADO_TEXTO[resultado.estado]}`,
-          `Vencimiento: ${resultado.fechaVencimiento}`,
+          `Vencimiento: ${formatoFechaAR(resultado.fechaVencimiento)}`,
           `Monto: ${formatoARS(resultado.monto)}`,
-          resultado.fechaPago ? `Fecha de pago: ${resultado.fechaPago}` : null,
+          resultado.fechaPago ? `Fecha de pago: ${formatoFechaAR(resultado.fechaPago)}` : null,
+          `(id: ${resultado.contratoId})`,
         ]
           .filter(Boolean)
           .join("\n");

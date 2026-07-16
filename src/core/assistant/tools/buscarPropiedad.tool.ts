@@ -16,7 +16,7 @@ export const buscarPropiedadTool = defineTool({
     return propiedades
       .map(
         (p) =>
-          `- [${p.id}] ${p.direccion}${p.zona ? ` (${p.zona})` : ""} — propietario: ${p.propietario.nombreCompleto}`,
+          `- ${p.direccion}${p.zona ? ` (${p.zona})` : ""} — propietario: ${p.propietario.nombreCompleto} (id: ${p.id})`,
       )
       .join("\n");
   },

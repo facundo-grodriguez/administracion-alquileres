@@ -16,7 +16,7 @@ export const buscarDocumentosTool = defineTool({
   }),
   run: async ({ propiedad_id, tipo_documento }) => {
     const propiedad = await propiedadesRepo.obtenerPropiedadPorId(propiedad_id);
-    if (!propiedad) return `No se encontró la propiedad ${propiedad_id}.`;
+    if (!propiedad) return "No encontré esa propiedad. Volvé a buscarla con buscar_propiedad.";
 
     const documentos = await documentosRepo.listarPorEntidad("propiedad", propiedad_id, tipo_documento);
     const carpeta = propiedad.carpetaDriveUrl ? `📁 Carpeta general: ${propiedad.carpetaDriveUrl}\n\n` : "";
@@ -24,10 +24,7 @@ export const buscarDocumentosTool = defineTool({
     if (documentos.length === 0) return `${carpeta}No hay documentos puntuales cargados para ${propiedad.direccion}.`;
 
     const lista = documentos
-      .map(
-        (d) =>
-          `- [${d.id}] ${d.nombreArchivo} (${d.tipoDocumento}) — ${d.storagePath}${d.notas ? ` — ${d.notas}` : ""}`,
-      )
+      .map((d) => `- ${d.nombreArchivo} (${d.tipoDocumento}) — ${d.storagePath}${d.notas ? ` — ${d.notas}` : ""}`)
       .join("\n");
     return `${carpeta}Documentos de ${propiedad.direccion} (${documentos.length}):\n${lista}`;
   },

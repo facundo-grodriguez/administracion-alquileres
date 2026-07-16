@@ -22,7 +22,7 @@ export const adjuntarComprobanteReparacionTool = defineTool({
       tipoDocumento: input.tipo_documento,
       notas: input.notas,
     });
-    if (!reparacion) return `No se encontró la reparación ${input.reparacion_id}.`;
+    if (!reparacion) return "No encontré esa reparación. Volvé a buscarla con listar_reparaciones.";
     return `Comprobante adjuntado a la reparación: ${reparacion.descripcion}.`;
   },
 });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as impuestosRepo from "../../repositories/impuestosServicios.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -17,7 +18,7 @@ export const listarImpuestosServiciosTool = defineTool({
       .map((i) => {
         const responsable = i.responsable ? ` — responsable: ${i.responsable}` : "";
         const monto = i.montoEstimado ? ` — ${formatoARS(i.montoEstimado)}` : "";
-        return `- [${i.id}] ${i.tipo} — vence ${i.fechaVencimiento}${responsable}${monto}`;
+        return `- ${i.tipo} — vence ${formatoFechaAR(i.fechaVencimiento)}${responsable}${monto}`;
       })
       .join("\n");
   },

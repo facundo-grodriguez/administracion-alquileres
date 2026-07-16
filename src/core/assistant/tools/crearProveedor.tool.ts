@@ -16,6 +16,15 @@ export const crearProveedorTool = defineTool({
   }),
   run: async (input) => {
     const proveedor = await proveedoresRepo.crearProveedor(input);
-    return `Proveedor registrado: [${proveedor.id}] ${proveedor.nombre} (${proveedor.categoria}).`;
+    return [
+      "Proveedor registrado.",
+      `Nombre: ${proveedor.nombre}`,
+      `Rubro: ${proveedor.categoria}`,
+      proveedor.zona ? `Zona: ${proveedor.zona}` : null,
+      proveedor.telefono ? `Teléfono: ${proveedor.telefono}` : null,
+      `(id: ${proveedor.id})`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

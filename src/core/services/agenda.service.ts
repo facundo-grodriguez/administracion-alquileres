@@ -1,5 +1,5 @@
 import * as reparacionesRepo from "../repositories/reparaciones.repository.js";
-import { hoyISO, sumarDiasISO } from "../util/fecha.js";
+import { formatoFechaAR, hoyISO, sumarDiasISO } from "../util/fecha.js";
 import { formatoARS } from "../util/formato.js";
 import * as pagosService from "./pagos.service.js";
 import * as vencimientosService from "./vencimientos.service.js";
@@ -47,14 +47,15 @@ export function formatearResumenAgenda(resumen: ResumenAgenda): string {
   if (cobrosPendientes.length > 0) {
     const lineas = cobrosPendientes.map((c) => {
       const marca = c.estado === "atrasado" ? " ⚠️ ATRASADO" : "";
-      return `  • ${c.inquilino} — ${c.propiedad} — ${formatoARS(c.monto)} (vence ${c.fechaVencimiento})${marca}`;
+      return `  • ${c.inquilino} — ${c.propiedad} — ${formatoARS(c.monto)} (vence ${formatoFechaAR(c.fechaVencimiento)})${marca}`;
     });
     bloques.push(`💰 Alquileres a cobrar (${cobrosPendientes.length}):\n${lineas.join("\n")}`);
   }
 
   if (vencimientos.length > 0) {
     const lineas = vencimientos.map(
-      (v) => `  • ${v.descripcion} — ${v.propiedad} — ${v.fechaVencimiento} (${diasTexto(v.diasRestantes)})`,
+      (v) =>
+        `  • ${v.descripcion} — ${v.propiedad} — ${formatoFechaAR(v.fechaVencimiento)} (${diasTexto(v.diasRestantes)})`,
     );
     bloques.push(`⏰ Vencimientos próximos (${vencimientos.length}):\n${lineas.join("\n")}`);
   }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as documentosRepo from "../../repositories/documentos.repository.js";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearDocumentoTool = defineTool({
@@ -24,6 +25,14 @@ export const crearDocumentoTool = defineTool({
       storagePath: input.link,
       notas: input.notas,
     });
-    return `Documento registrado: [${documento.id}] ${documento.nombreArchivo} (${documento.tipoDocumento}).`;
+    const propiedad = await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id);
+    return [
+      "Documento registrado.",
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      `Archivo: ${documento.nombreArchivo}`,
+      `Tipo: ${documento.tipoDocumento}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

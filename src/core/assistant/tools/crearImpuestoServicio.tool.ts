@@ -1,5 +1,8 @@
 import { z } from "zod";
 import * as impuestosRepo from "../../repositories/impuestosServicios.repository.js";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
+import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearImpuestoServicioTool = defineTool({
@@ -30,7 +33,16 @@ export const crearImpuestoServicioTool = defineTool({
       responsable: input.responsable,
       observaciones: input.observaciones,
     });
-    const responsableTxt = item.responsable ? ` — responsable: ${item.responsable}` : "";
-    return `Impuesto/servicio registrado: [${item.id}] ${item.tipo}, vence ${item.fechaVencimiento}${responsableTxt}.`;
+    const propiedad = await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id);
+    return [
+      "Impuesto/servicio registrado.",
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      `Tipo: ${item.tipo}`,
+      `Vencimiento: ${formatoFechaAR(item.fechaVencimiento)}`,
+      item.responsable ? `Responsable de pago: ${item.responsable}` : null,
+      item.montoEstimado ? `Monto estimado: ${formatoARS(item.montoEstimado)}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

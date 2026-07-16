@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as reparacionesRepo from "../../repositories/reparaciones.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -24,7 +25,7 @@ export const listarReparacionesTool = defineTool({
         const costo = r.costo ? ` — ${formatoARS(r.costo)}` : "";
         const proveedor = r.proveedor ? ` — proveedor: ${r.proveedor.nombre}` : "";
         const comprobante = r.comprobante ? " 📎" : "";
-        return `- [${r.id}] ${r.descripcion} — ${r.propiedad.direccion} — ${r.estado} (${r.fecha})${costo}${proveedor}${comprobante}`;
+        return `- ${r.descripcion} — ${r.propiedad.direccion} — ${r.estado} (${formatoFechaAR(r.fecha)})${costo}${proveedor}${comprobante} (id: ${r.id})`;
       })
       .join("\n");
   },

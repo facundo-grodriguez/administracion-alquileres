@@ -25,3 +25,33 @@ export function diasEntreISO(desde: string, hasta: string): number {
   const MS_POR_DIA = 24 * 60 * 60 * 1000;
   return Math.round((b.getTime() - a.getTime()) / MS_POR_DIA);
 }
+
+const MESES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+/** Convierte una fecha YYYY-MM-DD al formato DD/MM/AAAA para mostrarle al usuario. */
+export function formatoFechaAR(fechaISO: string): string {
+  const [anio, mes, dia] = fechaISO.split("-");
+  if (!anio || !mes || !dia) return fechaISO;
+  return `${dia}/${mes}/${anio}`;
+}
+
+/** Convierte un período YYYY-MM a "Mes AAAA" (ej: "2026-07" → "Julio 2026") para mostrarle al usuario. */
+export function formatoPeriodoAR(periodoYYYYMM: string): string {
+  const [anio, mes] = periodoYYYYMM.split("-");
+  const nombre = MESES[Number(mes) - 1];
+  if (!anio || !nombre) return periodoYYYYMM;
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`;
+}

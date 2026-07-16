@@ -10,7 +10,7 @@ export const vincularCarpetaDriveTool = defineTool({
   inputSchema: z.object({ propiedad_id: z.string(), url: z.string().describe("Link de la carpeta de Drive") }),
   run: async ({ propiedad_id, url }) => {
     const propiedad = await propiedadesRepo.actualizarCarpetaDrive(propiedad_id, url);
-    if (!propiedad) return `No se encontró la propiedad ${propiedad_id}.`;
+    if (!propiedad) return "No encontré esa propiedad. Volvé a buscarla con buscar_propiedad.";
     return `Carpeta de Drive vinculada a ${propiedad.direccion}.`;
   },
 });

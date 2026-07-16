@@ -1,4 +1,4 @@
-import { and, ilike } from "drizzle-orm";
+import { and, eq, ilike } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { proveedores } from "../db/schema.js";
 
@@ -8,6 +8,10 @@ export type NuevoProveedor = typeof proveedores.$inferInsert;
 export async function crearProveedor(datos: NuevoProveedor): Promise<Proveedor> {
   const filas = await db.insert(proveedores).values(datos).returning();
   return filas[0]!;
+}
+
+export async function obtenerProveedorPorId(id: string): Promise<Proveedor | undefined> {
+  return db.query.proveedores.findFirst({ where: eq(proveedores.id, id) });
 }
 
 export async function buscarProveedores(filtros: {

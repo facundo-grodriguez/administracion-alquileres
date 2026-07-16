@@ -1,4 +1,4 @@
-import { and, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { contratos, contratosGarantes, personas, propiedades } from "../db/schema.js";
 
@@ -10,6 +10,10 @@ export type RolPersona = "inquilino" | "propietario" | "garante";
 export async function crearPersona(datos: NuevaPersona): Promise<Persona> {
   const filas = await db.insert(personas).values(datos).returning();
   return filas[0]!;
+}
+
+export async function obtenerPersonaPorId(id: string): Promise<Persona | undefined> {
+  return db.query.personas.findFirst({ where: eq(personas.id, id) });
 }
 
 export async function buscarPersonas(query: string, rol?: RolPersona): Promise<Persona[]> {

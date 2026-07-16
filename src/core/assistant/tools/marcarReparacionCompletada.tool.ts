@@ -11,7 +11,7 @@ export const marcarReparacionCompletadaTool = defineTool({
   }),
   run: async ({ reparacion_id }) => {
     const reparacion = await reparacionesRepo.marcarCompletada(reparacion_id);
-    if (!reparacion) return `No se encontró la reparación ${reparacion_id}.`;
+    if (!reparacion) return "No encontré esa reparación. Volvé a buscarla con listar_reparaciones.";
     return `Reparación marcada como completada: ${reparacion.descripcion}.`;
   },
 });

@@ -3,7 +3,7 @@ import * as movimientosRepo from "../repositories/movimientosFinancieros.reposit
 import * as pagosRepo from "../repositories/pagos.repository.js";
 import * as personasRepo from "../repositories/personas.repository.js";
 import * as propiedadesRepo from "../repositories/propiedades.repository.js";
-import { hoyISO } from "../util/fecha.js";
+import { formatoPeriodoAR, hoyISO } from "../util/fecha.js";
 
 type ContratoConRelaciones = NonNullable<Awaited<ReturnType<typeof contratosRepo.buscarContratoPorId>>>;
 type EstadoPago = "pendiente" | "pagado" | "atrasado" | "parcial";
@@ -128,14 +128,14 @@ export async function crearRecibo(input: {
         fecha: pago.fechaPago,
         referenciaTipo: "pago",
         referenciaId: pago.id,
-        descripcion: `Alquiler ${input.periodo} — ${contrato.inquilino.nombreCompleto}`,
+        descripcion: `Alquiler ${formatoPeriodoAR(input.periodo)} — ${contrato.inquilino.nombreCompleto}`,
       });
     } catch (error) {
       console.error("No se pudo registrar el movimiento financiero del pago:", error);
     }
   }
 
-  return pago;
+  return { pago, contrato };
 }
 
 export type CobroDelMes = {

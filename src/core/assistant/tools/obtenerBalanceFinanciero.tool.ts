@@ -16,7 +16,7 @@ export const obtenerBalanceFinancieroTool = defineTool({
   }),
   run: async ({ propiedad_id, desde, hasta }) => {
     const propiedad = propiedad_id ? await propiedadesRepo.obtenerPropiedadPorId(propiedad_id) : undefined;
-    if (propiedad_id && !propiedad) return `No se encontró la propiedad ${propiedad_id}.`;
+    if (propiedad_id && !propiedad) return "No encontré esa propiedad. Volvé a buscarla con buscar_propiedad.";
 
     const balance = await movimientosService.calcularBalance({ propiedadId: propiedad_id, desde, hasta });
     return movimientosService.formatearBalance(balance, propiedad?.direccion);

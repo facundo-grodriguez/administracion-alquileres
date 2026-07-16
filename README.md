@@ -2,7 +2,7 @@
 
 Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos, cobros, seguros, impuestos/servicios, reparaciones (con proveedor asignado), documentación (links a Google Drive) y control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-**Versión actual: v3** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — deploy 24/7, edición/borrado de datos, subida real de archivos, entre otros).
+**Versión actual: v4** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — deploy 24/7, edición/borrado de datos, subida real de archivos, entre otros).
 
 ## Requisitos
 
@@ -135,7 +135,8 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 
 - **v1 — MVP**: personas, propiedades, contratos, pagos.
 - **v2 — Agenda y recordatorios**: seguros, impuestos/servicios, reparaciones, agenda unificada, recordatorio diario proactivo.
-- **v3 — Proveedores, documentación y financiero** *(actual)*: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
+- **v3 — Proveedores, documentación y financiero**: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
+- **v4 — Lenguaje de negocio** *(actual)*: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
 
 Detalle completo de cada etapa en [`docs/`](docs/README.md).
 

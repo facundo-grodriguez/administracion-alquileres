@@ -1,5 +1,9 @@
 import { z } from "zod";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import * as proveedoresRepo from "../../repositories/proveedores.repository.js";
 import * as reparacionesService from "../../services/reparaciones.service.js";
+import { formatoFechaAR } from "../../util/fecha.js";
+import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearReparacionTool = defineTool({
@@ -25,6 +29,21 @@ export const crearReparacionTool = defineTool({
       costo: input.costo,
       estado: input.estado ?? "pendiente",
     });
-    return `Reparación registrada: [${reparacion.id}] ${reparacion.descripcion} (${reparacion.estado}).`;
+    const [propiedad, proveedor] = await Promise.all([
+      propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id),
+      input.proveedor_id ? proveedoresRepo.obtenerProveedorPorId(input.proveedor_id) : Promise.resolve(undefined),
+    ]);
+    return [
+      "Reparación registrada.",
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      `Descripción: ${reparacion.descripcion}`,
+      `Fecha: ${formatoFechaAR(reparacion.fecha)}`,
+      proveedor ? `Proveedor: ${proveedor.nombre}` : null,
+      reparacion.costo ? `Costo: ${formatoARS(reparacion.costo)}` : null,
+      `Estado: ${reparacion.estado}`,
+      `(id: ${reparacion.id})`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

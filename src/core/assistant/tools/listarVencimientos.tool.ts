@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as vencimientosService from "../../services/vencimientos.service.js";
+import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -32,7 +33,7 @@ export const listarVencimientosTool = defineTool({
     return items
       .map((v) => {
         const monto = v.monto ? ` — ${formatoARS(v.monto)}` : "";
-        return `- [${v.tipo}] ${v.descripcion} — ${v.propiedad} — vence ${v.fechaVencimiento} (${diasTexto(v.diasRestantes)})${monto}`;
+        return `- ${v.descripcion} — ${v.propiedad} — vence ${formatoFechaAR(v.fechaVencimiento)} (${diasTexto(v.diasRestantes)})${monto}`;
       })
       .join("\n");
   },

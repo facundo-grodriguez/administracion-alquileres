@@ -1,5 +1,5 @@
 import * as movimientosRepo from "../repositories/movimientosFinancieros.repository.js";
-import { hoyISO } from "../util/fecha.js";
+import { formatoFechaAR, hoyISO } from "../util/fecha.js";
 import { formatoARS } from "../util/formato.js";
 
 export type BalanceFinanciero = {
@@ -28,17 +28,19 @@ export async function calcularBalance(filtros: {
 }
 
 export function formatearBalance(balance: BalanceFinanciero, propiedadDireccion?: string): string {
+  const desde = formatoFechaAR(balance.desde);
+  const hasta = formatoFechaAR(balance.hasta);
   const encabezado = propiedadDireccion
-    ? `💵 Balance de ${propiedadDireccion} (${balance.desde} a ${balance.hasta})`
-    : `💵 Balance general — todas las propiedades (${balance.desde} a ${balance.hasta})`;
+    ? `💵 Balance de ${propiedadDireccion} (${desde} a ${hasta})`
+    : `💵 Balance general — todas las propiedades (${desde} a ${hasta})`;
 
   if (balance.movimientos.length === 0) return `${encabezado}\n\nNo hay movimientos registrados en ese rango.`;
 
   const detalle = balance.movimientos
-    .map(
-      (m) =>
-        `  • [${m.tipo}] ${m.categoria} — ${formatoARS(m.monto)} (${m.fecha})${m.descripcion ? ` — ${m.descripcion}` : ""}`,
-    )
+    .map((m) => {
+      const signo = m.tipo === "ingreso" ? "+" : "-";
+      return `  • ${signo}${formatoARS(m.monto)} — ${m.categoria} (${formatoFechaAR(m.fecha)})${m.descripcion ? ` — ${m.descripcion}` : ""}`;
+    })
     .join("\n");
 
   return [

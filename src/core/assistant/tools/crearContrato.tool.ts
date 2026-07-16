@@ -1,5 +1,9 @@
 import { z } from "zod";
 import * as contratosRepo from "../../repositories/contratos.repository.js";
+import * as personasRepo from "../../repositories/personas.repository.js";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
+import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearContratoTool = defineTool({
@@ -40,6 +44,21 @@ export const crearContratoTool = defineTool({
       },
       input.garante_ids ?? [],
     );
-    return `Contrato creado: [${contrato.id}], vigente desde ${contrato.fechaInicio} hasta ${contrato.fechaFin}.`;
+    const [propiedad, inquilino] = await Promise.all([
+      propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id),
+      personasRepo.obtenerPersonaPorId(input.inquilino_id),
+    ]);
+    return [
+      "Contrato registrado.",
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      inquilino ? `Inquilino: ${inquilino.nombreCompleto}` : null,
+      `Inicio: ${formatoFechaAR(contrato.fechaInicio)}`,
+      `Finalización: ${formatoFechaAR(contrato.fechaFin)}`,
+      `Alquiler inicial: ${formatoARS(contrato.valorAlquilerInicial)}`,
+      `Vencimiento mensual: día ${contrato.diaVencimientoPago}`,
+      `(id: ${contrato.id})`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

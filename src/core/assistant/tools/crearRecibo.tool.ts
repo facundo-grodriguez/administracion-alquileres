@@ -1,5 +1,6 @@
 import { z } from "zod";
 import * as pagosService from "../../services/pagos.service.js";
+import { formatoPeriodoAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -18,7 +19,7 @@ export const crearReciboTool = defineTool({
     medio_pago: z.string().optional().describe("Ej: transferencia, efectivo"),
   }),
   run: async (input) => {
-    const pago = await pagosService.crearRecibo({
+    const { pago, contrato } = await pagosService.crearRecibo({
       contratoId: input.contrato_id,
       periodo: input.periodo,
       monto: input.monto,
@@ -26,6 +27,14 @@ export const crearReciboTool = defineTool({
       medioPago: input.medio_pago,
     });
     if (!pago) return "No se pudo registrar el pago.";
-    return `Pago registrado: período ${input.periodo}, ${formatoARS(pago.monto)}, cobrado el ${pago.fechaPago}.`;
+    return [
+      "Pago registrado.",
+      `Inquilino: ${contrato.inquilino.nombreCompleto}`,
+      `Propiedad: ${contrato.propiedad.direccion}`,
+      `Período: ${formatoPeriodoAR(input.periodo)}`,
+      `Importe: ${formatoARS(pago.monto)}`,
+      `Medio de pago: ${pago.medioPago ?? "no especificado"}`,
+      "Estado: Pagado",
+    ].join("\n");
   },
 });

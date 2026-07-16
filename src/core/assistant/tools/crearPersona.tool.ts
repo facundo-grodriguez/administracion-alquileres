@@ -24,6 +24,15 @@ export const crearPersonaTool = defineTool({
       direccion: input.direccion,
       notas: input.notas,
     });
-    return `Persona creada: [${persona.id}] ${persona.nombreCompleto}`;
+    return [
+      "Persona registrada.",
+      `Nombre: ${persona.nombreCompleto}`,
+      persona.dni ? `DNI: ${persona.dni}` : null,
+      persona.telefono ? `Teléfono: ${persona.telefono}` : null,
+      persona.email ? `Email: ${persona.email}` : null,
+      `(id: ${persona.id})`,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

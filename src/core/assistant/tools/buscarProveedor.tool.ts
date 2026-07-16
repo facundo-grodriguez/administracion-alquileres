@@ -18,7 +18,7 @@ export const buscarProveedorTool = defineTool({
     return proveedores
       .map((p) => {
         const confianza = p.confianza ? ` — confianza: ${p.confianza}/5` : "";
-        return `- [${p.id}] ${p.nombre} (${p.categoria})${p.zona ? ` — ${p.zona}` : ""}${p.telefono ? ` — tel: ${p.telefono}` : ""}${confianza}`;
+        return `- ${p.nombre} (${p.categoria})${p.zona ? ` — ${p.zona}` : ""}${p.telefono ? ` — tel: ${p.telefono}` : ""}${confianza} (id: ${p.id})`;
       })
       .join("\n");
   },

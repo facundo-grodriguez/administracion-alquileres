@@ -9,6 +9,7 @@ Para la vista completa por versión (qué está hecho y qué falta, todo junto) 
 | 1 | [MVP — bot conversacional](etapa-1-mvp.md) | ✅ Completada |
 | 2 | [Agenda unificada y recordatorios proactivos](etapa-2-agenda-recordatorios.md) | ✅ Completada |
 | 3 | [Proveedores, documentación, obligaciones ampliadas y financiero](etapa-3-proveedores-documentacion-financiero.md) | ✅ Completada |
+| 4 | [Lenguaje de negocio y ocultamiento de detalles técnicos](etapa-4-ux-lenguaje-de-negocio.md) | ✅ Completada |
 
 ## Convención
 

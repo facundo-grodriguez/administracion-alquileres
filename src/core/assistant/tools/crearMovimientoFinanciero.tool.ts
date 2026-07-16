@@ -1,5 +1,7 @@
 import { z } from "zod";
 import * as movimientosRepo from "../../repositories/movimientosFinancieros.repository.js";
+import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
+import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
 
@@ -27,6 +29,16 @@ export const crearMovimientoFinancieroTool = defineTool({
       fecha: input.fecha,
       descripcion: input.descripcion,
     });
-    return `Movimiento registrado: [${movimiento.tipo}] ${movimiento.categoria} — ${formatoARS(movimiento.monto)} (${movimiento.fecha}).`;
+    const propiedad = await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id);
+    return [
+      `${movimiento.tipo === "ingreso" ? "Ingreso" : "Gasto"} registrado.`,
+      propiedad ? `Propiedad: ${propiedad.direccion}` : null,
+      `Categoría: ${movimiento.categoria}`,
+      `Monto: ${formatoARS(movimiento.monto)}`,
+      `Fecha: ${formatoFechaAR(movimiento.fecha)}`,
+      movimiento.descripcion ? `Detalle: ${movimiento.descripcion}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });
