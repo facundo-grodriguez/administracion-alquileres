@@ -30,4 +30,10 @@ No tienen todavía un número de etapa asignado porque no se planificaron en det
 
 ## Convención de versión
 
-Cada etapa completada sube la versión menor (v1 → v2 → v3...). Todavía no se usó versionado semántico estricto en `package.json` (sigue en `0.1.0`); si el proyecto pasa a producción con deploy 24/7, es un buen momento para empezar a taggear releases en Git alineadas a este número.
+Desde que el proyecto se desplegó 24/7 (etapa 5), se usa versionado semántico estricto (`MAJOR.MINOR.PATCH`), reflejado en `package.json` y en tags de Git (`vX.Y.Z`) sobre cada commit relevante:
+
+- **MAJOR**: etapa nueva (módulo o capacidad significativa) — coincide con el número de etapa.
+- **MINOR**: funcionalidad menor agregada entre etapas (ej. el logger de uso de la QA general).
+- **PATCH**: fix o cambio de infraestructura sin funcionalidad nueva (ej. upgrade de Node, fix de un bug).
+
+Detalle versión por versión en [`CHANGELOG.md`](../CHANGELOG.md). El historial previo a la etapa 5 se etiquetó de forma retroactiva sobre los commits ya existentes.
