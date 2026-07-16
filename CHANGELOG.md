@@ -2,6 +2,9 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [6.0.0] — 2026-07-16 — Etapa 6
+Consulta de garantes por chat. Seguros e impuestos/servicios se pueden marcar como pagados y se reflejan solos en el balance financiero (dejan de aparecer como vencimiento pendiente una vez pagados). Ver [`docs/etapa-6-garantes-y-balance.md`](docs/etapa-6-garantes-y-balance.md).
+
 ## [5.0.1] — 2026-07-16
 Adopción de versionado estricto: tags de Git retroactivos para el historial existente, este changelog, `package.json` alineado.
 

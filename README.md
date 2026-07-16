@@ -2,7 +2,7 @@
 
 Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos, cobros, seguros, impuestos/servicios, reparaciones (con proveedor asignado), documentación (links a Google Drive) y control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-**Versión actual: v5** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — edición/borrado de datos, subida real de archivos, entre otros).
+**Versión actual: v6** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — interfaz web y WhatsApp, confirmadas para más adelante).
 
 ## Requisitos
 
@@ -141,16 +141,14 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 - **v2 — Agenda y recordatorios**: seguros, impuestos/servicios, reparaciones, agenda unificada, recordatorio diario proactivo.
 - **v3 — Proveedores, documentación y financiero**: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
 - **v4 — Lenguaje de negocio**: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
-- **v5 — Deploy 24/7** *(actual)*: modo webhook + `render.yaml` listos para correr en Render sin depender de que el administrador tenga la PC prendida.
+- **v5 — Deploy 24/7**: modo webhook + `render.yaml` para correr en Render sin depender de que el administrador tenga la PC prendida.
+- **v6 — Garantes y balance** *(actual)*: consulta de garantes por chat; seguros e impuestos/servicios se pueden marcar como pagados y se reflejan solos en el balance financiero.
 
 Detalle completo de cada etapa en [`docs/`](docs/README.md).
 
 ## Próximas fases
 
-- Edición y borrado de propiedades, personas, proveedores y contratos (hoy solo alta y consulta).
-- Documentación digital: subida real de archivos a Supabase Storage (hoy son links a Google Drive).
-- Que seguros e impuestos/servicios alimenten el balance financiero cuando se marcan como pagados.
-- Recordatorios por-evento escalados (varios avisos con urgencia creciente, no solo el digest diario).
-- Interfaz web, reutilizando `src/core` sin cambios.
+- Interfaz web: panel de solo lectura (agenda, balance, listados), reutilizando `src/core` sin cambios.
+- WhatsApp como canal adicional (costo no es problema para este volumen, pero requiere verificación de Meta Business).
 
-Ver [docs/roadmap.md](docs/roadmap.md) para el detalle de por qué cada una todavía no se hizo.
+Edición/borrado de datos, subida real de archivos y recordatorios por-evento escalados se evaluaron y se descartaron por ahora — ver [docs/roadmap.md](docs/roadmap.md) para el detalle de por qué.

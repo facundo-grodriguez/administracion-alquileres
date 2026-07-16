@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { seguros } from "../db/schema.js";
 
@@ -12,12 +12,22 @@ export async function crearSeguro(datos: NuevoSeguro): Promise<Seguro> {
   return filas[0]!;
 }
 
+/** Seguros por vencer que todavía no se marcaron como pagados. */
 export async function listarSegurosPorVencer(desde: string, hasta: string) {
   return db.query.seguros.findMany({
-    where: and(gte(seguros.fechaVencimiento, desde), lte(seguros.fechaVencimiento, hasta)),
+    where: and(gte(seguros.fechaVencimiento, desde), lte(seguros.fechaVencimiento, hasta), isNull(seguros.fechaPago)),
     with: conPropiedad,
     orderBy: seguros.fechaVencimiento,
   });
+}
+
+export async function marcarPagado(id: string, fechaPago: string, monto?: string): Promise<Seguro | undefined> {
+  const filas = await db
+    .update(seguros)
+    .set({ fechaPago, ...(monto ? { costo: monto } : {}) })
+    .where(eq(seguros.id, id))
+    .returning();
+  return filas[0];
 }
 
 export async function listarSegurosPorPropiedad(propiedadId: string) {

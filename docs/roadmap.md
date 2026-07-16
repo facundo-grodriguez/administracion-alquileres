@@ -10,23 +10,28 @@ Vista rápida de qué versión del asistente está en producción, qué se const
 | v2 | 2 — Agenda y recordatorios | Seguros, impuestos/servicios y reparaciones (alta + consulta). Agenda unificada (`obtener_agenda`). Recordatorio diario proactivo (digest por Telegram, mientras el bot esté prendido). | [etapa-2-agenda-recordatorios.md](etapa-2-agenda-recordatorios.md) |
 | v3 | 3 — Proveedores, documentación y financiero | Proveedores (alta/búsqueda, asignables a reparaciones). Reparaciones con proveedor y comprobante adjunto. Obligaciones ampliadas: tipo "internet" + responsable de pago (propietario/inquilino). Documentación con links a Google Drive por propiedad. Movimientos financieros (ingresos/gastos) con balance por propiedad o general, auto-poblados desde pagos y reparaciones. | [etapa-3-proveedores-documentacion-financiero.md](etapa-3-proveedores-documentacion-financiero.md) |
 | v4 | 4 — Lenguaje de negocio | El asistente deja de mostrar IDs internos, UUIDs y fechas en formato ISO en cualquier respuesta (chat y digest diario). Confirmaciones de alta completas (propiedad, inquilino, montos, fechas en DD/MM/AAAA) con formato uniforme: confirmación → info principal → datos relevantes → próximo paso sugerido. | [etapa-4-ux-lenguaje-de-negocio.md](etapa-4-ux-lenguaje-de-negocio.md) |
-| v5 | 5 — Deploy 24/7 | Modo webhook + `render.yaml` + ping externo (GitHub Actions) para correr en Render free tier sin depender de la PC del administrador. Código listo; falta que el usuario cree la cuenta y despliegue. | [etapa-5-deploy-24-7.md](etapa-5-deploy-24-7.md) |
+| v5 | 5 — Deploy 24/7 | Modo webhook + `render.yaml` + ping externo (GitHub Actions) para correr en Render free tier sin depender de la PC del administrador. Deploy confirmado funcionando. | [etapa-5-deploy-24-7.md](etapa-5-deploy-24-7.md) |
+| v6 | 6 — Garantes y balance | Consulta de garantes por chat. Seguros e impuestos/servicios pueden marcarse como pagados y se reflejan solos en el balance financiero (ya no aparecen como vencimiento pendiente una vez pagados). | [etapa-6-garantes-y-balance.md](etapa-6-garantes-y-balance.md) |
 
 Además, entre etapas se hizo una **QA general** del proyecto (revisión de arquitectura, corrección de 2 bugs reales — monto no actualizado al corregir un pago, digest marcado como enviado aunque fallaran todos los envíos —, eliminación de código muerto, límite de tokens/temperatura estandarizado en el único call site de OpenAI, logger de uso/costo por `DEBUG_AI=true`) y una **migración de infraestructura** (Node 18 → 22+/24, limpieza de datos de prueba duplicados en la base).
 
 ## Pendientes ⏳
 
-No tienen todavía un número de etapa asignado porque no se planificaron en detalle; orden sugerido de mayor a menor impacto práctico:
+Revisadas explícitamente con el usuario en la etapa 6. Confirmadas para más adelante:
 
-| Candidata | Qué requeriría | Por qué todavía no |
+| Candidata | Qué requeriría | Estado |
 |---|---|---|
-| **Consulta de garantes** | Tool que exponga la relación contrato↔garante (el dato ya existe en `contratos_garantes`, no hay endpoint). | Detectado en QA de etapa 4/5, gap de alcance menor, no bloqueante. |
-| **Edición y borrado** de propiedades, personas, proveedores, contratos | Tools de update/delete + reglas de qué se puede borrar si tiene datos relacionados (ej. una propiedad con contratos). | Hoy el asistente solo da de alta y consulta; corregir un dato mal cargado requiere entrar directo a Supabase. |
-| **Subida real de archivos** (Supabase Storage) | Cliente de Storage (ya hay credenciales reservadas para esto) + tool de subida vía Telegram (recibir el archivo, no solo el link). | Etapa 3 resolvió la documentación con links a Drive, que ya cubre el caso de uso principal sin necesitar credenciales adicionales ni manejo de archivos binarios. |
-| **`seguros`/`impuestos_servicios` alimentando el balance financiero** | Agregarles un concepto de "pagado" (fecha de pago real), como ya tiene `pagos`. | Requiere decidir el modelo de datos correcto para no mezclar "obligación" con "pago realizado" — quedó documentado como decisión explícita en la etapa 3. |
-| **Recordatorios por-evento escalados** (varios avisos con urgencia creciente, no solo el digest diario) | Ampliar `recordatorios` (ya trackea qué se avisó) + lógica de umbrales. | El digest diario (etapa 2) ya cubre el caso de uso principal; esto es un refinamiento, no una funcionalidad faltante. |
-| **Interfaz web** | Nueva capa en `src/interfaces/web`, reutilizando `src/core` sin cambios (arquitectura ya preparada para esto). | Telegram cubre el uso actual (administrador único); no hay necesidad concreta todavía. |
-| **WhatsApp / email** como canal adicional | Nueva capa en `src/interfaces`, análogo a Telegram. | No pedido todavía; Telegram es el canal principal. |
+| **Interfaz web** | Nueva capa en `src/interfaces/web` (panel de **solo lectura**: agenda, balance, listados — sin repetir el asistente de IA), reutilizando `src/core` sin cambios. | Confirmada, alcance a definir cuando se planifique. |
+| **WhatsApp** como canal adicional | Nueva capa en `src/interfaces`, análoga a Telegram, vía Cloud API de Meta. | Confirmada como candidata; costo no es impedimento (conversaciones iniciadas por el usuario son gratis e ilimitadas, el único mensaje proactivo diario cuesta fracciones de centavo) pero requiere verificación de Meta Business — más fricción de setup que Telegram. |
+
+Descartadas explícitamente por el usuario en la etapa 6 (no son bugs ni gaps, son decisiones de alcance):
+
+| Candidata | Por qué se descartó |
+|---|---|
+| Edición y borrado de propiedades/personas/proveedores/contratos | Prefiere que dependa del mantenimiento manual (Supabase directo) o que sea un upgrade si se lo piden más adelante. |
+| Subida real de archivos (Supabase Storage) | Los links a Google Drive de la etapa 3 ya cubren el caso de uso; no hace falta manejar archivos binarios. |
+| Recordatorios por-evento escalados | El digest diario de la etapa 2 ya alcanza. |
+| Email como canal adicional | Telegram (y eventualmente WhatsApp) cubren el uso actual. |
 
 ## Convención de versión
 

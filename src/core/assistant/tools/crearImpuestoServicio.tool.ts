@@ -41,6 +41,7 @@ export const crearImpuestoServicioTool = defineTool({
       `Vencimiento: ${formatoFechaAR(item.fechaVencimiento)}`,
       item.responsable ? `Responsable de pago: ${item.responsable}` : null,
       item.montoEstimado ? `Monto estimado: ${formatoARS(item.montoEstimado)}` : null,
+      `(id: ${item.id})`,
     ]
       .filter(Boolean)
       .join("\n");

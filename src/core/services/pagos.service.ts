@@ -91,6 +91,37 @@ export async function obtenerEstadoPago(inquilinoOPropiedad: string, periodo?: s
   };
 }
 
+export type ResultadoGarantes =
+  | { tipo: "ambiguo"; candidatos: string[] }
+  | { tipo: "no_encontrado" }
+  | { tipo: "sin_contrato_vigente"; nombre: string }
+  | {
+      tipo: "resuelto";
+      inquilino: string;
+      propiedad: string;
+      garantes: { nombreCompleto: string; dni: string | null; telefono: string | null }[];
+    };
+
+export async function obtenerGarantes(inquilinoOPropiedad: string): Promise<ResultadoGarantes> {
+  const resolucion = await resolverContrato(inquilinoOPropiedad);
+  if ("ambiguo" in resolucion) return { tipo: "ambiguo", candidatos: resolucion.ambiguo };
+  if ("noEncontrado" in resolucion) return { tipo: "no_encontrado" };
+  if ("sinContratoVigente" in resolucion)
+    return { tipo: "sin_contrato_vigente", nombre: resolucion.sinContratoVigente };
+
+  const { contrato } = resolucion;
+  return {
+    tipo: "resuelto",
+    inquilino: contrato.inquilino.nombreCompleto,
+    propiedad: contrato.propiedad.direccion,
+    garantes: contrato.garantes.map((g) => ({
+      nombreCompleto: g.persona.nombreCompleto,
+      dni: g.persona.dni,
+      telefono: g.persona.telefono,
+    })),
+  };
+}
+
 export async function crearRecibo(input: {
   contratoId: string;
   periodo: string;

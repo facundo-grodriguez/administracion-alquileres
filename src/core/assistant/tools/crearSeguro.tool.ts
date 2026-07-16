@@ -35,6 +35,7 @@ export const crearSeguroTool = defineTool({
       seguro.numeroPoliza ? `Póliza: ${seguro.numeroPoliza}` : null,
       `Vencimiento: ${formatoFechaAR(seguro.fechaVencimiento)}`,
       seguro.costo ? `Costo: ${formatoARS(seguro.costo)}` : null,
+      `(id: ${seguro.id})`,
     ]
       .filter(Boolean)
       .join("\n");

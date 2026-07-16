@@ -8,7 +8,7 @@ export const listarImpuestosServiciosTool = defineTool({
   name: "listar_impuestos_servicios",
   description:
     "Lista los impuestos/servicios (ABL, ARBA, luz, gas, agua, expensas, internet, otro) cargados para una " +
-    "propiedad, con su responsable de pago si está cargado. A diferencia de listar_vencimientos, no se limita " +
+    "propiedad, con su responsable de pago y estado de pago. A diferencia de listar_vencimientos, no se limita " +
     "a los que vencen pronto. Requiere el ID de la propiedad.",
   inputSchema: z.object({ propiedad_id: z.string() }),
   run: async ({ propiedad_id }) => {
@@ -18,7 +18,8 @@ export const listarImpuestosServiciosTool = defineTool({
       .map((i) => {
         const responsable = i.responsable ? ` — responsable: ${i.responsable}` : "";
         const monto = i.montoEstimado ? ` — ${formatoARS(i.montoEstimado)}` : "";
-        return `- ${i.tipo} — vence ${formatoFechaAR(i.fechaVencimiento)}${responsable}${monto}`;
+        const estado = i.fechaPago ? `pagado el ${formatoFechaAR(i.fechaPago)}` : "pendiente de pago";
+        return `- ${i.tipo} — vence ${formatoFechaAR(i.fechaVencimiento)}${responsable}${monto} — ${estado} (id: ${i.id})`;
       })
       .join("\n");
   },

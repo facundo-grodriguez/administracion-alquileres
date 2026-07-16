@@ -15,6 +15,13 @@
       "when": 1784163532857,
       "tag": "0001_premium_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784220665485,
+      "tag": "0002_fearless_captain_britain",
+      "breakpoints": true
     }
   ]
 }
