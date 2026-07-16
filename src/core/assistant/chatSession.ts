@@ -93,6 +93,9 @@ async function ejecutarTool(toolCall: OpenAI.Chat.Completions.ChatCompletionMess
     const input = tool.inputSchema.parse(argumentosCrudos);
     return await tool.run(input);
   } catch (error) {
-    return `Error ejecutando ${tool.name}: ${error instanceof Error ? error.message : String(error)}`;
+    // El mensaje crudo (SQL, nombres de tabla/columna, stack) queda solo en el log del servidor.
+    // Al modelo le llega una instrucción neutra: nunca debe recibir ni repetir detalles técnicos.
+    console.error(`Error ejecutando la tool "${tool.name}":`, error);
+    return `No se pudo completar la acción. Explicale al usuario en lenguaje simple, sin tecnicismos, que hubo un problema y pedile que verifique los datos o lo intente de nuevo.`;
   }
 }
