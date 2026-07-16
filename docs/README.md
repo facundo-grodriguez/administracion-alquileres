@@ -2,7 +2,7 @@
 
 Historial de las etapas de desarrollo del asistente de administración de alquileres. Cada etapa tiene su propio documento con qué se construyó, decisiones tomadas y estado.
 
-Para la vista completa por versión (qué está hecho y qué falta, todo junto) ver **[roadmap.md](roadmap.md)**.
+Para la vista completa por versión (qué está hecho y qué falta, todo junto) ver **[roadmap.md](roadmap.md)**. Para un recorrido completo de todo lo que hace el sistema hoy, con ejemplos reales de conversación y el circuito técnico de punta a punta, ver **[circuito-completo.md](circuito-completo.md)**.
 
 | Etapa | Documento | Estado |
 |---|---|---|
