@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: administracion-alquileres-bot
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm run bot
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.4
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_USER_IDS
+        sync: false
+      - key: AGENDA_HORA
+        value: "09:00"
+      - key: AGENDA_TIMEZONE
+        value: America/Argentina/Buenos_Aires
+      - key: AGENDA_DIAS_ANTICIPACION
+        value: "30"
+      - key: DEBUG_AI
+        value: "false"

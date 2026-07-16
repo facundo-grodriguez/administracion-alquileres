@@ -2,7 +2,7 @@
 
 Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos, cobros, seguros, impuestos/servicios, reparaciones (con proveedor asignado), documentación (links a Google Drive) y control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-**Versión actual: v4** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — deploy 24/7, edición/borrado de datos, subida real de archivos, entre otros).
+**Versión actual: v5** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — edición/borrado de datos, subida real de archivos, entre otros).
 
 ## Requisitos
 
@@ -81,7 +81,11 @@ Bot de Telegram para centralizar la gestión de un portfolio de alquileres: prop
 
 ### Recordatorio diario automático
 
-El bot manda una vez por día (por defecto 09:00, hora Argentina) el resumen de la agenda a los IDs autorizados. Se configura con `AGENDA_HORA`, `AGENDA_TIMEZONE` y `AGENDA_DIAS_ANTICIPACION` en el `.env`. **Requiere que el bot esté prendido a esa hora** — para que llegue siempre, hay que desplegarlo 24/7 (etapa siguiente).
+El bot manda una vez por día (por defecto 09:00, hora Argentina) el resumen de la agenda a los IDs autorizados. Se configura con `AGENDA_HORA`, `AGENDA_TIMEZONE` y `AGENDA_DIAS_ANTICIPACION` en el `.env`. **Requiere que el bot esté corriendo a esa hora** — corriendo local, depende de que la PC esté prendida; desplegado en Render (ver [Deploy](#deploy-247) abajo) corre solo, con la salvedad del free tier que se explica ahí.
+
+## Deploy 24/7
+
+Para que el bot funcione sin depender de la PC del administrador, ver la guía paso a paso en [`docs/etapa-5-deploy-24-7.md`](docs/etapa-5-deploy-24-7.md). Resumen: se despliega en [Render](https://render.com) (plan free) usando el `render.yaml` de este repo, con un modo webhook (en vez de long-polling) que le permite al servicio recibir mensajes aunque el free tier lo duerma por inactividad. Como el free tier no corre nada mientras está dormido, el recordatorio diario depende de un ping externo (gratis, vía GitHub Actions) que lo despierta un rato antes de `AGENDA_HORA` — ver el detalle y las limitaciones conocidas en el documento de la etapa.
 
 ## Scripts
 
@@ -136,13 +140,13 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 - **v1 — MVP**: personas, propiedades, contratos, pagos.
 - **v2 — Agenda y recordatorios**: seguros, impuestos/servicios, reparaciones, agenda unificada, recordatorio diario proactivo.
 - **v3 — Proveedores, documentación y financiero**: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
-- **v4 — Lenguaje de negocio** *(actual)*: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
+- **v4 — Lenguaje de negocio**: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
+- **v5 — Deploy 24/7** *(actual)*: modo webhook + `render.yaml` listos para correr en Render sin depender de que el administrador tenga la PC prendida.
 
 Detalle completo de cada etapa en [`docs/`](docs/README.md).
 
 ## Próximas fases
 
-- **Deploy 24/7** (Railway u otro) para que el recordatorio diario llegue aunque el bot no esté corriendo local — es lo más importante que falta.
 - Edición y borrado de propiedades, personas, proveedores y contratos (hoy solo alta y consulta).
 - Documentación digital: subida real de archivos a Supabase Storage (hoy son links a Google Drive).
 - Que seguros e impuestos/servicios alimenten el balance financiero cuando se marcan como pagados.

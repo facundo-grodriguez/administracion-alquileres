@@ -1,5 +1,6 @@
 import { setDefaultResultOrder } from "node:dns";
-import { Bot } from "grammy";
+import { createServer } from "node:http";
+import { Bot, webhookCallback } from "grammy";
 import { env } from "../../config/env.js";
 import { ChatSession } from "../../core/assistant/chatSession.js";
 import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
@@ -106,7 +107,6 @@ bot.on("message:text", async (ctx) => {
 
 bot.catch((err) => console.error("Error no capturado del bot:", err.error));
 
-console.log("Bot de Telegram iniciado. Esperando mensajes... (Ctrl+C para detener)");
 if (autorizados.size === 0) {
   console.warn(
     "Aviso: TELEGRAM_ALLOWED_USER_IDS está vacío, así que nadie está autorizado todavía. " +
@@ -117,7 +117,36 @@ if (autorizados.size === 0) {
   iniciarSchedulerAgenda(bot, [...autorizados]);
 }
 
-bot.start();
+// Render (y otros hosts similares) exponen la URL pública en RENDER_EXTERNAL_URL automáticamente;
+// WEBHOOK_URL permite fijarla a mano en otras plataformas. Si ninguna está seteada, se asume
+// desarrollo local y se usa long-polling (no requiere URL pública).
+const webhookUrl = process.env.WEBHOOK_URL || process.env.RENDER_EXTERNAL_URL;
 
-process.once("SIGINT", () => bot.stop());
-process.once("SIGTERM", () => bot.stop());
+if (webhookUrl) {
+  // Modo webhook: pensado para hosts que duermen el proceso sin tráfico HTTP entrante (ej. el
+  // free tier de Render). Cualquier request entrante lo despierta — tanto el webhook real de
+  // Telegram como un ping externo (ej. un workflow de GitHub Actions) programado antes de la
+  // hora del recordatorio diario, para que el scheduler interno llegue a dispararlo a tiempo.
+  await bot.init();
+  const manejarWebhook = webhookCallback(bot, "http");
+  const puerto = Number(process.env.PORT) || 3000;
+  const servidor = createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/telegram-webhook") {
+      manejarWebhook(req, res);
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("OK");
+  });
+  await bot.api.setWebhook(`${webhookUrl}/telegram-webhook`);
+  servidor.listen(puerto, () => {
+    console.log(`Bot de Telegram iniciado en modo webhook (${webhookUrl}), escuchando en el puerto ${puerto}.`);
+  });
+  process.once("SIGINT", () => servidor.close());
+  process.once("SIGTERM", () => servidor.close());
+} else {
+  console.log("Bot de Telegram iniciado en modo long-polling. Esperando mensajes... (Ctrl+C para detener)");
+  bot.start();
+  process.once("SIGINT", () => bot.stop());
+  process.once("SIGTERM", () => bot.stop());
+}

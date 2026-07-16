@@ -1,0 +1,24 @@
+name: Ping antes del recordatorio diario
+
+# El free tier de Render duerme el proceso tras ~15 min sin tráfico HTTP. Este workflow le pega
+# una request al bot un rato antes de AGENDA_HORA (09:00 America/Argentina/Buenos_Aires por
+# defecto = 12:00 UTC, sin cambio de horario en Argentina) para que esté despierto y el cron
+# interno (node-cron) llegue a disparar el resumen diario a horario.
+#
+# Si cambiás AGENDA_HORA en el .env de Render, actualizá el cron de abajo para que siga
+# apuntando a ~10 minutos antes (en UTC).
+#
+# Requiere el secret BOT_URL en este repo (Settings → Secrets and variables → Actions) con la
+# URL pública del servicio en Render, ej: https://administracion-alquileres-bot.onrender.com
+
+on:
+  schedule:
+    - cron: "50 11 * * *" # 11:50 UTC = 08:50 ART
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Despertar el bot
+        run: curl --fail --silent --show-error --max-time 60 "${{ secrets.BOT_URL }}" || true
