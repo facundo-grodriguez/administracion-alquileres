@@ -13,6 +13,7 @@ Para la vista completa por versión (qué está hecho y qué falta, todo junto) 
 | 5 | [Deploy 24/7 (Render free tier)](etapa-5-deploy-24-7.md) | ✅ Completada (deploy confirmado funcionando) |
 | 6 | [Consulta de garantes y seguros/impuestos alimentando el balance](etapa-6-garantes-y-balance.md) | ✅ Completada |
 | 7 | [Modelo simplificado + actualización automática por IPC](etapa-7-modelo-simplificado-y-actualizacion-automatica.md) | 🟡 Código listo, falta cargar `RAPIDAPI_KEY` |
+| 8 | [Botones interactivos contextuales (Telegram)](etapa-8-botones-interactivos.md) | ✅ Completada |
 
 ## Convención
 

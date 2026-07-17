@@ -1,9 +1,18 @@
 import { setDefaultResultOrder } from "node:dns";
 import { createServer } from "node:http";
+import type { Context } from "grammy";
 import { Bot, webhookCallback } from "grammy";
 import { env } from "../../config/env.js";
-import { ChatSession } from "../../core/assistant/chatSession.js";
+import { ChatSession, type RespuestaAsistente } from "../../core/assistant/chatSession.js";
 import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
+import {
+  construirInlineKeyboard,
+  menuPrincipalKeyboard,
+  NAV_CANCELAR,
+  NAV_MENU,
+  TEXTO_MENU_PRINCIPAL,
+  textoParaCallback,
+} from "./keyboards.js";
 import { enviarDigestDiario, iniciarSchedulerAgenda } from "./scheduler.js";
 import { dividirMensaje } from "./util.js";
 
@@ -32,11 +41,11 @@ function sesionDe(chatId: number): ChatSession {
 }
 
 const AYUDA = [
-  "Soy el asistente de administración de alquileres. Escribime lo que necesites, por ejemplo:",
+  "Soy el asistente de administración de alquileres. Usá los botones de abajo o escribime lo que necesites, por ejemplo:",
   "• ¿Qué tengo pendiente hoy?",
   "• ¿Está pago el alquiler de Juan?",
-  "• ¿Qué seguros tengo que renovar?",
-  "• Cargá un seguro de La Caja para [propiedad] que vence el 30/08",
+  "• ¿Corresponde actualizar el alquiler de Juan?",
+  "• Cargá un gasto de expensas para [propiedad] que vence el 30/08",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
   "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /reset, /ayuda",
@@ -57,12 +66,22 @@ bot.use(async (ctx, next) => {
   );
 });
 
-bot.command("start", (ctx) => ctx.reply(AYUDA));
-bot.command("ayuda", (ctx) => ctx.reply(AYUDA));
+/** Manda la respuesta del asistente, adjuntando el teclado contextual (si hay) solo al último tramo. */
+async function responder(ctx: Context, respuesta: RespuestaAsistente): Promise<void> {
+  const partes = dividirMensaje(respuesta.texto);
+  const teclado = respuesta.teclado ? construirInlineKeyboard(respuesta.teclado) : undefined;
+  for (let i = 0; i < partes.length; i++) {
+    const esUltima = i === partes.length - 1;
+    await ctx.reply(partes[i]!, esUltima && teclado ? { reply_markup: teclado } : undefined);
+  }
+}
+
+bot.command("start", (ctx) => ctx.reply(AYUDA, { reply_markup: menuPrincipalKeyboard }));
+bot.command("ayuda", (ctx) => ctx.reply(AYUDA, { reply_markup: menuPrincipalKeyboard }));
 
 bot.command("reset", (ctx) => {
   sesiones.delete(ctx.chat.id);
-  return ctx.reply("Listo, arrancamos una conversación nueva.");
+  return ctx.reply("Listo, arrancamos una conversación nueva.", { reply_markup: menuPrincipalKeyboard });
 });
 
 bot.command("agenda", async (ctx) => {
@@ -93,14 +112,52 @@ bot.on("message:text", async (ctx) => {
   const texto = ctx.message.text;
   if (texto.startsWith("/")) return; // comando desconocido: lo ignoramos
 
+  // Los botones del menú principal (Reply Keyboard) llegan como este mismo texto — se traducen
+  // a una frase más clara antes de mandarla al asistente.
+  const textoParaAsistente = TEXTO_MENU_PRINCIPAL[texto] ?? texto;
+
   await ctx.replyWithChatAction("typing");
   try {
-    const respuesta = await sesionDe(ctx.chat.id).enviarMensaje(texto);
-    for (const parte of dividirMensaje(respuesta)) {
-      await ctx.reply(parte);
-    }
+    const respuesta = await sesionDe(ctx.chat.id).enviarMensaje(textoParaAsistente);
+    await responder(ctx, respuesta);
   } catch (error) {
     console.error("Error procesando el mensaje:", error);
+    await ctx.reply("Uf, ocurrió un error procesando tu pedido. Probá de nuevo en un momento.");
+  }
+});
+
+// Botones de los teclados contextuales (Inline Keyboard). "nav:menu" y "nav:cancelar" se resuelven
+// acá mismo, sin pasar por el modelo — son navegación pura, no hace falta gastar la API por eso.
+bot.on("callback_query:data", async (ctx) => {
+  const datos = ctx.callbackQuery.data;
+  await ctx.answerCallbackQuery();
+  try {
+    await ctx.editMessageReplyMarkup(); // saca el teclado del mensaje ya presionado
+  } catch {
+    // el mensaje puede ser muy viejo para editarlo; no es grave, seguimos igual.
+  }
+
+  if (datos === NAV_MENU) {
+    await ctx.reply("Menú principal.", { reply_markup: menuPrincipalKeyboard });
+    return;
+  }
+  if (datos === NAV_CANCELAR) {
+    await ctx.reply("Cancelado.");
+    return;
+  }
+
+  const textoParaAsistente = textoParaCallback(datos);
+  if (!textoParaAsistente) {
+    console.warn(`callback_data desconocido: ${datos}`);
+    return;
+  }
+
+  await ctx.replyWithChatAction("typing");
+  try {
+    const respuesta = await sesionDe(ctx.chat!.id).enviarMensaje(textoParaAsistente);
+    await responder(ctx, respuesta);
+  } catch (error) {
+    console.error("Error procesando el botón:", error);
     await ctx.reply("Uf, ocurrió un error procesando tu pedido. Probá de nuevo en un momento.");
   }
 });

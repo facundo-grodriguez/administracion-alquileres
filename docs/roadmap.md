@@ -13,6 +13,7 @@ Vista rápida de qué versión del asistente está en producción, qué se const
 | v5 | 5 — Deploy 24/7 | Modo webhook + `render.yaml` + ping externo (GitHub Actions) para correr en Render free tier sin depender de la PC del administrador. Deploy confirmado funcionando. | [etapa-5-deploy-24-7.md](etapa-5-deploy-24-7.md) |
 | v6 | 6 — Garantes y balance | Consulta de garantes por chat. Seguros e impuestos/servicios pueden marcarse como pagados y se reflejan solos en el balance financiero (ya no aparecen como vencimiento pendiente una vez pagados). | [etapa-6-garantes-y-balance.md](etapa-6-garantes-y-balance.md) |
 | v7 | 7 — Modelo simplificado + actualización por IPC | Seguros e impuestos/servicios unificados en una sola tabla de "gastos de propiedad". Seguro Finaer pasa a ser parte del contrato. Actualización automática del alquiler por IPC (`actualizar_alquiler`), sin gastar la API si todavía no corresponde. Reparaciones, proveedores y documentación quedan deshabilitados (código intacto). | [etapa-7-modelo-simplificado-y-actualizacion-automatica.md](etapa-7-modelo-simplificado-y-actualizacion-automatica.md) |
+| v8 | 8 — Botones interactivos | Menú principal (Reply Keyboard) + 12 teclados contextuales (Inline Keyboard) que cambian según el momento de la conversación — inferidos automáticamente tras un alta exitosa, o señalados por el modelo con `sugerir_botones` para preguntas de opción múltiple. El texto libre sigue funcionando igual en todo momento. | [etapa-8-botones-interactivos.md](etapa-8-botones-interactivos.md) |
 
 Además, entre etapas se hizo una **QA general** del proyecto (revisión de arquitectura, corrección de 2 bugs reales — monto no actualizado al corregir un pago, digest marcado como enviado aunque fallaran todos los envíos —, eliminación de código muerto, límite de tokens/temperatura estandarizado en el único call site de OpenAI, logger de uso/costo por `DEBUG_AI=true`) y una **migración de infraestructura** (Node 18 → 22+/24, limpieza de datos de prueba duplicados en la base).
 
@@ -22,6 +23,7 @@ Revisadas explícitamente con el usuario en la etapa 6. Confirmadas para más ad
 
 | Candidata | Qué requeriría | Estado |
 |---|---|---|
+| **Cargar `RAPIDAPI_KEY`** | Ninguna: es solo cargar el valor en Render/`.env`. | Pendiente explícito desde la etapa 7 — sin esto, `actualizar_alquiler` nunca calcula el valor real. |
 | **Interfaz web** | Nueva capa en `src/interfaces/web` (panel de **solo lectura**: agenda, balance, listados — sin repetir el asistente de IA), reutilizando `src/core` sin cambios. | Confirmada, alcance a definir cuando se planifique. |
 | **WhatsApp** como canal adicional | Nueva capa en `src/interfaces`, análoga a Telegram, vía Cloud API de Meta. | Confirmada como candidata; costo no es impedimento (conversaciones iniciadas por el usuario son gratis e ilimitadas, el único mensaje proactivo diario cuesta fracciones de centavo) pero requiere verificación de Meta Business — más fricción de setup que Telegram. |
 

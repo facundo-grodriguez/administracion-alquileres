@@ -2,6 +2,9 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [8.0.0] — 2026-07-16 — Etapa 8
+Botones interactivos contextuales en Telegram: menú principal fijo (Reply Keyboard) + 12 teclados contextuales (Inline Keyboard) que cambian según el momento de la conversación — inferidos automáticamente tras un alta exitosa (`crear_propiedad`/`crear_contrato`/`crear_recibo`/`crear_gasto`), o señalados por el modelo con la tool `sugerir_botones` para preguntas de opción múltiple. Nueva tool `consultar_contrato`. El texto libre sigue funcionando igual en todo momento. Fix de un bug preexistente en `buscar_persona` (el filtro `rol` no encontraba personas recién asignadas por primera vez). Ver [`docs/etapa-8-botones-interactivos.md`](docs/etapa-8-botones-interactivos.md).
+
 ## [7.0.0] — 2026-07-16 — Etapa 7
 Modelo simplificado: `seguros`+`impuestos_servicios` unificados en `gastos_propiedad`; Seguro Finaer pasa a ser parte del contrato. Actualización automática del alquiler por IPC (`actualizar_alquiler`), sin consultar la API si todavía no corresponde. Reparaciones, proveedores y documentación quedan deshabilitados (código intacto, no registrados en el asistente). Ver [`docs/etapa-7-modelo-simplificado-y-actualizacion-automatica.md`](docs/etapa-7-modelo-simplificado-y-actualizacion-automatica.md).
 

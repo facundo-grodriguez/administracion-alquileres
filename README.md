@@ -2,7 +2,7 @@
 
 Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes con Seguro Finaer), contratos con actualización automática del alquiler por IPC, cobros y gastos de la propiedad (expensas, ABL, ARBA, servicios, seguros — todos en un mismo lugar) con control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-**Versión actual: v7** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — interfaz web y WhatsApp, confirmadas para más adelante). Reparaciones, proveedores y documentación están deshabilitados por diseño (modelo simplificado) — el código sigue en el repo, ver `docs/roadmap.md`.
+**Versión actual: v8** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — interfaz web y WhatsApp, confirmadas para más adelante). Reparaciones, proveedores y documentación están deshabilitados por diseño (modelo simplificado) — el código sigue en el repo, ver `docs/roadmap.md`.
 
 ## Requisitos
 
@@ -142,7 +142,8 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 - **v4 — Lenguaje de negocio**: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
 - **v5 — Deploy 24/7**: modo webhook + `render.yaml` para correr en Render sin depender de que el administrador tenga la PC prendida.
 - **v6 — Garantes y balance**: consulta de garantes por chat; seguros e impuestos/servicios se pueden marcar como pagados y se reflejan solos en el balance financiero.
-- **v7 — Modelo simplificado + IPC** *(actual)*: gastos de propiedad unificados en una sola tabla; Seguro Finaer como parte del contrato; actualización automática del alquiler por IPC; reparaciones/proveedores/documentación deshabilitados.
+- **v7 — Modelo simplificado + IPC**: gastos de propiedad unificados en una sola tabla; Seguro Finaer como parte del contrato; actualización automática del alquiler por IPC; reparaciones/proveedores/documentación deshabilitados.
+- **v8 — Botones interactivos** *(actual)*: menú principal fijo (Reply Keyboard) + teclados contextuales (Inline Keyboard) que cambian según el momento de la conversación, inferidos automáticamente o señalados por el modelo. El texto libre sigue funcionando igual en todo momento.
 
 Detalle completo de cada etapa en [`docs/`](docs/README.md).
 

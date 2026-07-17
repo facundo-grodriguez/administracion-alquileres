@@ -29,7 +29,8 @@ async function main(): Promise<void> {
 
       try {
         const respuesta = await session.enviarMensaje(texto);
-        stdout.write(`\n${respuesta}\n\n`);
+        const hint = respuesta.teclado ? `\n[opciones: ${respuesta.teclado}]` : "";
+        stdout.write(`\n${respuesta.texto}${hint}\n\n`);
       } catch (error) {
         console.error("\nOcurrió un error:", error instanceof Error ? error.message : error, "\n");
       }

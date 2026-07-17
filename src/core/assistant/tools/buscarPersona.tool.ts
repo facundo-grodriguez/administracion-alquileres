@@ -7,7 +7,14 @@ export const buscarPersonaTool = defineTool({
   description: "Busca personas (inquilinos, propietarios o garantes) por nombre, DNI o teléfono.",
   inputSchema: z.object({
     query: z.string().describe("Nombre, DNI o teléfono a buscar"),
-    rol: z.enum(["inquilino", "propietario", "garante"]).optional().describe("Filtrar por rol, si se conoce"),
+    rol: z
+      .enum(["inquilino", "propietario", "garante"])
+      .optional()
+      .describe(
+        "Filtrar por rol, si se conoce. OJO: solo encuentra personas que YA cumplen ese rol en algún " +
+          "contrato/propiedad existente. Si estás buscando a alguien para asignarlo por primera vez (ej. el " +
+          "inquilino de un contrato nuevo), NO pases este filtro — buscala solo por nombre/DNI, sin rol.",
+      ),
   }),
   run: async ({ query, rol }) => {
     const personas = await personasRepo.buscarPersonas(query, rol);
