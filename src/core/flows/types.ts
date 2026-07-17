@@ -25,7 +25,15 @@ export type CampoFlujo =
   | { tipo: "fecha"; opcional?: boolean; permitirHoy?: boolean }
   | { tipo: "periodo"; opcional?: boolean }
   | { tipo: "opciones"; opciones: OpcionCampo[] }
-  | { tipo: "entidad"; buscar: (query: string) => Promise<CandidatoFlujo[]>; crear?: FlowId }
+  | {
+      tipo: "entidad";
+      buscar: (query: string) => Promise<CandidatoFlujo[]>;
+      crear?: FlowId;
+      /** Datos a precargar en el sub-flujo de alta inline (ej. el rol, para no volver a preguntarlo). */
+      datosCrear?: DatosFlujo;
+      /** Etiqueta del botón "➕ Crear ...", en vez del genérico "➕ Crear nuevo". */
+      etiquetaCrear?: string;
+    }
   | { tipo: "confirmacion" };
 
 export type PasoFlujo = {
@@ -70,11 +78,20 @@ export function crearEstadoFlujo(): FlowState {
 
 export type ResultadoFlujo =
   | { tipo: "pregunta"; texto: string; campo: CampoFlujo }
-  | { tipo: "candidatos"; texto: string; candidatos: CandidatoFlujo[]; permiteCrear?: FlowId }
+  | {
+      tipo: "candidatos";
+      texto: string;
+      candidatos: CandidatoFlujo[];
+      permiteCrear?: FlowId;
+      etiquetaCrear?: string;
+      /** true = resultado de una búsqueda que escribió el usuario; ausente/false = listado inicial de existentes. */
+      esBusqueda?: boolean;
+    }
   | { tipo: "reprompt"; texto: string; campo: CampoFlujo }
   | { tipo: "interrumpido"; textoOriginal: string }
   | { tipo: "completado"; texto: string; botonesPostAccion?: ContextoTeclado }
   | { tipo: "cancelado"; texto: string }
+  | { tipo: "confirmar_cancelacion"; texto: string }
   | { tipo: "sin_flujo" };
 
 /** Clave donde se guarda la etiqueta en lenguaje de negocio de un campo "entidad" ya resuelto. */

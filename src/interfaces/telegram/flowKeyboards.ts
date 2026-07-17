@@ -70,10 +70,21 @@ export function renderResultado(resultado: ResultadoFlujo): { texto: string; tec
       resultado.candidatos.forEach((candidato, i) => {
         teclado.text(candidato.etiqueta, `flujo:sel:${i}`).row();
       });
-      if (resultado.permiteCrear) teclado.text("➕ Crear nuevo", `flujo:crear:${resultado.permiteCrear}`).row();
-      teclado.text("🔍 Buscar de nuevo", "flujo:buscar_de_nuevo").row();
+      if (resultado.permiteCrear) {
+        teclado.text(resultado.etiquetaCrear ?? "➕ Crear nuevo", `flujo:crear:${resultado.permiteCrear}`).row();
+      }
+      // "Buscar de nuevo" solo tiene sentido después de una búsqueda real — en el listado inicial
+      // de existentes el usuario puede escribir para buscar en cualquier momento, sin el botón.
+      if (resultado.esBusqueda) teclado.text("🔍 Buscar de nuevo", "flujo:buscar_de_nuevo").row();
       return { texto: resultado.texto, teclado: botonCancelar(teclado) };
     }
+    case "confirmar_cancelacion":
+      return {
+        texto: resultado.texto,
+        teclado: new InlineKeyboard()
+          .text("✅ Sí, cancelar", "flujo:cancelar_si")
+          .text("↩️ Continuar cargando", "flujo:continuar"),
+      };
     case "completado":
       return {
         texto: resultado.texto,

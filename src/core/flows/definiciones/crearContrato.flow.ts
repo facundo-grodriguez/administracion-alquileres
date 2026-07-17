@@ -35,8 +35,14 @@ function pasoGaranteSiNo(n: 1 | 2 | 3): PasoFlujo {
 function pasoGaranteId(n: 1 | 2 | 3): PasoFlujo {
   return {
     id: `garante${n}_id`,
-    pregunta: () => "¿Quién es? Escribí el nombre o DNI para buscarlo.",
-    campo: { tipo: "entidad", buscar: buscarPersonasParaFlujo(), crear: "crear_persona" },
+    pregunta: () => "¿Quién es? Elegí uno de la lista o escribí el nombre/DNI para buscar otro.",
+    campo: {
+      tipo: "entidad",
+      buscar: buscarPersonasParaFlujo(),
+      crear: "crear_persona",
+      datosCrear: { tipo_persona: "garante" },
+      etiquetaCrear: "➕ Crear garante",
+    },
     saltar: (datos) => datos[`garante${n}_si`] !== "si",
   };
 }
@@ -48,13 +54,25 @@ export const crearContratoFlow: DefinicionFlujo = {
   pasos: [
     {
       id: "propiedad_id",
-      pregunta: () => "¿De qué propiedad es el contrato? Escribí la dirección para buscarla.",
-      campo: { tipo: "entidad", buscar: buscarPropiedadesParaFlujo, crear: "crear_propiedad" },
+      pregunta: () =>
+        "¿De qué propiedad es el contrato? Elegí una de la lista o escribí la dirección para buscar otra.",
+      campo: {
+        tipo: "entidad",
+        buscar: buscarPropiedadesParaFlujo,
+        crear: "crear_propiedad",
+        etiquetaCrear: "➕ Crear propiedad",
+      },
     },
     {
       id: "inquilino_id",
-      pregunta: () => "¿Quién es el inquilino? Escribí el nombre o DNI para buscarlo.",
-      campo: { tipo: "entidad", buscar: buscarPersonasParaFlujo(), crear: "crear_persona" },
+      pregunta: () => "¿Quién es el inquilino? Elegí uno de la lista o escribí el nombre/DNI para buscar otro.",
+      campo: {
+        tipo: "entidad",
+        buscar: buscarPersonasParaFlujo(),
+        crear: "crear_persona",
+        datosCrear: { tipo_persona: "inquilino" },
+        etiquetaCrear: "➕ Crear inquilino",
+      },
     },
     pasoGaranteSiNo(1),
     pasoGaranteId(1),

@@ -30,8 +30,13 @@ export const crearGastoFlow: DefinicionFlujo = {
   pasos: [
     {
       id: "propiedad_id",
-      pregunta: () => "¿De qué propiedad es el gasto? Escribí la dirección para buscarla.",
-      campo: { tipo: "entidad", buscar: buscarPropiedadesParaFlujo, crear: "crear_propiedad" },
+      pregunta: () => "¿De qué propiedad es el gasto? Elegí una de la lista o escribí la dirección para buscar otra.",
+      campo: {
+        tipo: "entidad",
+        buscar: buscarPropiedadesParaFlujo,
+        crear: "crear_propiedad",
+        etiquetaCrear: "➕ Crear propiedad",
+      },
     },
     { id: "tipo", pregunta: () => "¿Qué tipo de gasto es?", campo: { tipo: "opciones", opciones: TIPOS_GASTO } },
     { id: "fecha_vencimiento", pregunta: () => "¿Fecha de vencimiento?", campo: { tipo: "fecha" } },

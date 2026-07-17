@@ -2,6 +2,18 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.1.0] — 2026-07-17 — QA v9
+Ajustes a los flujos guiados de la etapa 9, a partir de una ronda de prueba real por Telegram:
+(1) el texto final de cada alta ya no muestra el `(id: ...)` interno; (2) `crear_persona` standalone
+pregunta primero el tipo (Propietario/Inquilino/Garante) y confirma con un encabezado acorde
+("✅ Inquilino registrado correctamente."); (3) los pasos que relacionan entidades (propietario,
+inquilino, garante, propiedad) muestran de entrada un listado de los existentes como botones, sin
+esperar a que el usuario escriba nada — reutilizando el dato en vez de pedir escribirlo de nuevo;
+(4) el botón "➕ Crear nuevo" ahora dice qué crea puntualmente (ej. "➕ Crear inquilino"); (5) el
+botón "❌ Cancelar" pide confirmación antes de descartar la carga en curso, en cualquier paso —
+un toque accidental ya no borra todo sin aviso. Cuando un sub-flujo de alta inline ya conoce el rol
+por contexto (ej. el inquilino de un contrato nuevo), no lo vuelve a preguntar.
+
 ## [9.0.0] — 2026-07-17 — Etapa 9
 Flujos guiados por máquina de estados (`src/core/flows`) para las 6 altas del asistente (persona, propiedad, contrato, pago, gasto, Seguro Finaer): se completan 100% por botones/texto corto, sin ninguna llamada a OpenAI, reutilizando exactamente las mismas tools que usa la IA. Soporta sub-flujos anidados (crear una persona o propiedad nueva sin salir del alta de un contrato) y detecta si el usuario abandonó el flujo a mitad de camino para derivarlo al asistente. Los 4 accesos fijos del menú principal (Propiedades/Contratos/Pagos/Resumen) también dejaron de pasar por OpenAI. De paso se corrigió un alias de import (`@/config/env.js`) inconsistente con el resto del proyecto. Ver [`docs/etapa-9-flujos-guiados.md`](docs/etapa-9-flujos-guiados.md).
 

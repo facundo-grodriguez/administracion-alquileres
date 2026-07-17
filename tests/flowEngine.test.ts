@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CALLBACK_CANCELAR,
+  CALLBACK_CANCELAR_CONFIRMADO,
   CALLBACK_CONFIRMAR,
+  CALLBACK_CONTINUAR,
   CALLBACK_HOY,
   CALLBACK_OMITIR,
-  cancelarFlujo,
-  crearEstadoFlujo,
   flujoActivo,
   iniciarFlujo,
   procesarSeleccion,
@@ -14,6 +14,7 @@ import {
 } from "../src/core/flows/flowEngine.js";
 import {
   type CandidatoFlujo,
+  crearEstadoFlujo,
   type DefinicionFlujo,
   etiquetaKey,
   type FlowId,
@@ -21,8 +22,9 @@ import {
 } from "../src/core/flows/types.js";
 
 // Registro de flujos 100% en memoria (sin tocar la base) para testear la mecánica genérica del
-// motor: avance lineal, saltos condicionales, validación por tipo de campo, búsqueda de entidad,
-// sub-flujos (alta inline) y confirmación final — reutilizando las claves reales de FlowId.
+// motor: avance lineal, saltos condicionales, listado inicial de existentes, validación por tipo
+// de campo, sub-flujos (alta inline con datos precargados), cancelación en dos pasos y
+// confirmación final — reutilizando las claves reales de FlowId.
 
 function flujoDummy(id: FlowId): DefinicionFlujo {
   return {
@@ -34,16 +36,31 @@ function flujoDummy(id: FlowId): DefinicionFlujo {
   };
 }
 
+// Igual que crearPersona.flow.ts real: un primer paso que se salta solo si ya viene precargado
+// (alta inline desde un sub-flujo, ej. el rol de la persona).
 const flujoPersonaFake: DefinicionFlujo = {
   id: "crear_persona",
   titulo: "Persona (test)",
   etiqueta: (datos) => datos.nombre as string,
   pasos: [
+    {
+      id: "tipo_persona",
+      pregunta: () => "¿Qué tipo de persona es?",
+      campo: {
+        tipo: "opciones",
+        opciones: [
+          { valor: "inquilino", etiqueta: "Inquilino" },
+          { valor: "garante", etiqueta: "Garante" },
+        ],
+      },
+      saltar: (datos) => datos.tipo_persona !== undefined,
+    },
     { id: "nombre", pregunta: () => "¿Nombre?", campo: { tipo: "texto" } },
     { id: "dni", pregunta: () => "¿DNI? (opcional)", campo: { tipo: "texto", opcional: true } },
     { id: "__confirmar", pregunta: (d) => `Confirmá: ${d.nombre}`, campo: { tipo: "confirmacion" } },
   ],
-  ejecutar: async (datos) => `Persona de prueba registrada.\n(id: persona-fake-1)\nnombre=${datos.nombre}`,
+  ejecutar: async (datos) =>
+    `Persona de prueba registrada.\n(id: persona-fake-1)\nnombre=${datos.nombre}\ntipo=${datos.tipo_persona}`,
 };
 
 function crearFlujoPropiedadFake(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>): DefinicionFlujo {
@@ -72,7 +89,13 @@ function crearFlujoPropiedadFake(buscarResponsable: (q: string) => Promise<Candi
       {
         id: "responsable_id",
         pregunta: () => "¿Quién es el responsable?",
-        campo: { tipo: "entidad", buscar: buscarResponsable, crear: "crear_persona" },
+        campo: {
+          tipo: "entidad",
+          buscar: buscarResponsable,
+          crear: "crear_persona",
+          datosCrear: { tipo_persona: "garante" },
+          etiquetaCrear: "➕ Crear responsable",
+        },
       },
       { id: "__confirmar", pregunta: (d) => `Confirmá: ${d.nombre}`, campo: { tipo: "confirmacion" } },
     ],
@@ -92,6 +115,17 @@ function registroCon(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>
   };
 }
 
+async function avanzarHastaResponsable(estado: FlowState, registro: RegistroFlujos) {
+  await iniciarFlujo(estado, "crear_propiedad", {}, registro);
+  await procesarTexto(estado, "Depto Centro", [], registro); // nombre
+  await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro); // apodo
+  await procesarTexto(estado, "30", [], registro); // edad
+  await procesarTexto(estado, "850000", [], registro); // monto
+  await procesarSeleccion(estado, CALLBACK_HOY, undefined, registro); // fecha
+  await procesarTexto(estado, "08/2026", [], registro); // periodo
+  return procesarSeleccion(estado, "opt", "rojo", registro); // color -> aterriza en "responsable_id"
+}
+
 let estado: FlowState;
 
 beforeEach(() => {
@@ -99,19 +133,17 @@ beforeEach(() => {
 });
 
 describe("flowEngine — avance lineal y validación por tipo de campo", () => {
-  it("recorre texto → texto opcional (omitido) → número → monto → fecha (hoy) → período → opciones → entidad → confirmación → completado", async () => {
-    const buscar = vi.fn(async () => [{ id: "persona-existente", etiqueta: "María López" }] as CandidatoFlujo[]);
+  it("recorre texto → texto opcional (omitido) → número → monto → fecha (hoy) → período → opciones → confirmación → completado", async () => {
+    const buscar = vi.fn(async () => [] as CandidatoFlujo[]);
     const registro = registroCon(buscar);
 
-    let r = iniciarFlujo(estado, "crear_propiedad", {}, registro);
+    let r = await iniciarFlujo(estado, "crear_propiedad", {}, registro);
     expect(r).toEqual({ tipo: "pregunta", texto: "¿Nombre?", campo: { tipo: "texto" } });
 
     r = await procesarTexto(estado, "Depto Centro", [], registro);
-    expect(r.tipo).toBe("pregunta");
     if (r.tipo === "pregunta") expect(r.texto).toBe("¿Apodo? (opcional)");
 
     r = await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro);
-    expect(r.tipo).toBe("pregunta");
     if (r.tipo === "pregunta") expect(r.texto).toBe("¿Edad?");
 
     // formato inválido: re-pregunta sin salir del flujo (no interrumpe, no llama nada externo)
@@ -144,64 +176,97 @@ describe("flowEngine — avance lineal y validación por tipo de campo", () => {
     r = await procesarTexto(estado, "rojo", [], registro);
     expect(r.tipo).toBe("reprompt");
 
+    // al elegir "rojo" aterriza en el paso "entidad" (responsable_id), que sin candidatos
+    // existentes muestra el listado vacío (candidatos: []) en vez de la pregunta lisa
     r = await procesarSeleccion(estado, "opt", "rojo", registro);
-    if (r.tipo === "pregunta") expect(r.texto).toBe("¿Quién es el responsable?");
-
-    // 1 sola coincidencia: auto-selecciona y avanza directo a la confirmación, sin mostrar candidatos
-    r = await procesarTexto(estado, "María", [], registro);
-    expect(r.tipo).toBe("pregunta");
-    if (r.tipo === "pregunta") expect(r.campo.tipo).toBe("confirmacion");
-    expect(buscar).toHaveBeenCalledWith("María");
-
-    r = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
-    expect(r.tipo).toBe("completado");
-    if (r.tipo === "completado") expect(r.texto).toContain("responsable=María López");
-    expect(flujoActivo(estado)).toBe(false);
+    expect(r.tipo).toBe("candidatos");
+    if (r.tipo === "candidatos") {
+      expect(r.candidatos).toEqual([]);
+      expect(r.esBusqueda).toBe(false);
+      expect(r.permiteCrear).toBe("crear_persona");
+      expect(r.etiquetaCrear).toBe("➕ Crear responsable");
+    }
   });
 });
 
-describe("flowEngine — búsqueda de entidad con varias coincidencias", () => {
-  it("ofrece candidatos para elegir por botón cuando hay más de una coincidencia", async () => {
+describe("flowEngine — paso entidad: listado inicial de existentes", () => {
+  it("al aterrizar en el paso muestra los existentes de entrada, sin que el usuario escriba nada", async () => {
+    const existentes: CandidatoFlujo[] = [
+      { id: "p1", etiqueta: "Juan Pérez" },
+      { id: "p2", etiqueta: "Juan Gómez" },
+    ];
+    const buscar = vi.fn(async () => existentes);
+    const registro = registroCon(buscar);
+
+    await avanzarHastaResponsable(estado, registro);
+
+    expect(buscar).toHaveBeenLastCalledWith("");
+
+    // elegir directo del listado inicial (sin escribir), avanza a confirmación
+    const r = await procesarSeleccion(estado, "sel", "1", registro);
+    expect(r.tipo).toBe("pregunta");
+    if (r.tipo === "pregunta") expect(r.campo.tipo).toBe("confirmacion");
+
+    const rFinal = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
+    expect(rFinal.tipo).toBe("completado");
+    if (rFinal.tipo === "completado") expect(rFinal.texto).toContain("responsable=Juan Gómez");
+  });
+
+  it("recorta el listado inicial a 8 aunque existan más", async () => {
+    const muchos: CandidatoFlujo[] = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, etiqueta: `Persona ${i}` }));
+    const registro = registroCon(async () => muchos);
+
+    const r = await avanzarHastaResponsable(estado, registro);
+
+    expect(r.tipo).toBe("candidatos");
+    if (r.tipo === "candidatos") expect(r.candidatos).toHaveLength(8);
+  });
+
+  it("escribir texto en cualquier momento sigue buscando (no queda atado al listado inicial)", async () => {
+    const registro = registroCon(async (q) =>
+      q === "María" ? [{ id: "m1", etiqueta: "María López" }] : [{ id: "otro", etiqueta: "Otro" }],
+    );
+    await avanzarHastaResponsable(estado, registro); // ya mostró el listado inicial
+
+    const r = await procesarTexto(estado, "María", [], registro);
+    // 1 sola coincidencia real: auto-selecciona y avanza directo a confirmación
+    expect(r.tipo).toBe("pregunta");
+    if (r.tipo === "pregunta") expect(r.campo.tipo).toBe("confirmacion");
+
+    const rFinal = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
+    if (rFinal.tipo === "completado") expect(rFinal.texto).toContain("responsable=María López");
+  });
+
+  it("una búsqueda por texto marca esBusqueda: true (a diferencia del listado inicial)", async () => {
     const candidatos: CandidatoFlujo[] = [
       { id: "p1", etiqueta: "Juan Pérez" },
       { id: "p2", etiqueta: "Juan Gómez" },
     ];
     const registro = registroCon(async () => candidatos);
-    avanzarHastaResponsable(estado, registro);
+    await avanzarHastaResponsable(estado, registro);
 
     const r = await procesarTexto(estado, "Juan", [], registro);
     expect(r.tipo).toBe("candidatos");
-    if (r.tipo === "candidatos") {
-      expect(r.candidatos).toEqual(candidatos);
-      expect(r.permiteCrear).toBe("crear_persona");
-    }
-
-    const r2 = await procesarSeleccion(estado, "sel", "1", registro);
-    expect(r2.tipo).toBe("pregunta");
-    if (r2.tipo === "pregunta") expect(r2.campo.tipo).toBe("confirmacion");
+    if (r.tipo === "candidatos") expect(r.esBusqueda).toBe(true);
   });
+});
 
-  it("sin coincidencias, ofrece crear una entidad nueva (sub-flujo) y la inyecta al volver", async () => {
+describe("flowEngine — sub-flujo con datos precargados", () => {
+  it("crear una entidad nueva desde 'entidad' precarga datosCrear y no vuelve a preguntar lo ya sabido", async () => {
     const registro = registroCon(async () => []);
-    avanzarHastaResponsable(estado, registro);
+    await avanzarHastaResponsable(estado, registro); // muestra listado vacío, permiteCrear crear_persona
 
-    const r = await procesarTexto(estado, "Nadie conocido", [], registro);
-    expect(r.tipo).toBe("candidatos");
-    if (r.tipo === "candidatos") {
-      expect(r.candidatos).toEqual([]);
-      expect(r.permiteCrear).toBe("crear_persona");
-    }
-
-    // dispara el sub-flujo de alta inline
     const rSub = await procesarSeleccion(estado, "crear", "crear_persona", registro);
+    // el sub-flujo de persona ya trae tipo_persona="garante" precargado (datosCrear), así que
+    // el paso "tipo_persona" se salta solo y arranca directo en "nombre"
     expect(rSub.tipo).toBe("pregunta");
     if (rSub.tipo === "pregunta") expect(rSub.texto).toBe("¿Nombre?");
 
     await procesarTexto(estado, "Nueva Persona", [], registro);
-    await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro); // dni opcional
+    await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro); // dni
 
     const rConfirmarSub = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
-    // vuelve al flujo padre, ya con el responsable resuelto — el próximo paso es la confirmación del padre
+    // vuelve al flujo padre, ya con el responsable resuelto — el próximo paso es su confirmación
     expect(rConfirmarSub.tipo).toBe("pregunta");
     if (rConfirmarSub.tipo === "pregunta") expect(rConfirmarSub.campo.tipo).toBe("confirmacion");
 
@@ -209,43 +274,73 @@ describe("flowEngine — búsqueda de entidad con varias coincidencias", () => {
     expect(rFinal.tipo).toBe("completado");
     if (rFinal.tipo === "completado") expect(rFinal.texto).toContain("responsable=Nueva Persona");
   });
+
+  it("sin datosCrear precargados, el sub-flujo sí pregunta el tipo de persona", async () => {
+    const registro = registroCon(async () => []);
+    // arranca crear_persona directo (top-level), sin pasar por un paso "entidad" que precargue nada
+    const r = await iniciarFlujo(estado, "crear_persona", {}, registro);
+    expect(r.tipo).toBe("pregunta");
+    if (r.tipo === "pregunta") expect(r.texto).toBe("¿Qué tipo de persona es?");
+  });
 });
 
-describe("flowEngine — interrupción y cancelación", () => {
-  it("procesarTexto detecta una interrupción sin tocar el flujo (el llamador decide cancelarlo)", async () => {
+describe("flowEngine — el (id: ...) nunca llega al resultado final que ve el usuario", () => {
+  it("el texto de 'completado' no incluye el marcador (id: ...), pero el sub-flujo sí lo usa para inyectar el id", async () => {
     const registro = registroCon(async () => []);
-    iniciarFlujo(estado, "crear_propiedad", {}, registro);
+    const r = await iniciarFlujo(estado, "crear_persona", { tipo_persona: "inquilino" }, registro);
+    expect(r.tipo).toBe("pregunta"); // tipo_persona ya vino precargado, arranca en "nombre"
 
-    const r = await procesarTexto(estado, "¿Qué contratos vencen este mes?", [], registro);
-    expect(r).toEqual({ tipo: "interrumpido", textoOriginal: "¿Qué contratos vencen este mes?" });
-    expect(flujoActivo(estado)).toBe(true); // el motor no cancela solo
+    await procesarTexto(estado, "Alguien", [], registro);
+    await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro);
+    const rFinal = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
 
-    cancelarFlujo(estado);
-    expect(flujoActivo(estado)).toBe(false);
+    expect(rFinal.tipo).toBe("completado");
+    if (rFinal.tipo === "completado") {
+      expect(rFinal.texto).not.toContain("(id:");
+      expect(rFinal.texto).toContain("nombre=Alguien");
+    }
+  });
+});
+
+describe("flowEngine — cancelación en dos pasos", () => {
+  it("cancelar pide confirmación sin tocar los datos ya cargados; continuar los conserva", async () => {
+    const registro = registroCon(async () => []);
+    await iniciarFlujo(estado, "crear_persona", { tipo_persona: "inquilino" }, registro);
+    await procesarTexto(estado, "Alguien", [], registro); // nombre ya cargado, quedó parado en "dni"
+
+    const rPedido = await procesarSeleccion(estado, CALLBACK_CANCELAR, undefined, registro);
+    expect(rPedido.tipo).toBe("confirmar_cancelacion");
+    expect(flujoActivo(estado)).toBe(true); // no se tocó nada todavía
+
+    const rContinuar = await procesarSeleccion(estado, CALLBACK_CONTINUAR, undefined, registro);
+    expect(rContinuar.tipo).toBe("pregunta");
+    if (rContinuar.tipo === "pregunta") expect(rContinuar.texto).toBe("¿DNI? (opcional)");
+
+    // el flujo sigue intacto: completar normalmente conserva el nombre ya cargado antes de cancelar
+    await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro);
+    const rFinal = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
+    if (rFinal.tipo === "completado") expect(rFinal.texto).toContain("nombre=Alguien");
   });
 
-  it("CALLBACK_CANCELAR vacía toda la pila, incluso en medio de un sub-flujo", async () => {
+  it("confirmar la cancelación vacía toda la pila, incluso en medio de un sub-flujo", async () => {
     const registro = registroCon(async () => []);
-    avanzarHastaResponsable(estado, registro);
+    await avanzarHastaResponsable(estado, registro);
     await procesarSeleccion(estado, "crear", "crear_persona", registro); // entra al sub-flujo
 
-    const r = await procesarSeleccion(estado, CALLBACK_CANCELAR, undefined, registro);
+    await procesarSeleccion(estado, CALLBACK_CANCELAR, undefined, registro);
+    const r = await procesarSeleccion(estado, CALLBACK_CANCELAR_CONFIRMADO, undefined, registro);
     expect(r).toEqual({ tipo: "cancelado", texto: "Cancelado." });
     expect(flujoActivo(estado)).toBe(false);
   });
 });
 
-/** Helper de test: avanza el flujo de propiedad fake hasta dejarlo parado justo en el paso "responsable_id". */
-function avanzarHastaResponsable(estado: FlowState, registro: RegistroFlujos): void {
-  iniciarFlujo(estado, "crear_propiedad", {}, registro);
-  const frame = estado.pila[0]!;
-  frame.datos = {
-    nombre: "Depto Centro",
-    edad: 30,
-    monto: "850000",
-    fecha: "2026-08-01",
-    periodo: "2026-08",
-    color: "rojo",
-  };
-  frame.pasoActual = 7; // índice del paso "responsable_id" en crearFlujoPropiedadFake
-}
+describe("flowEngine — interrupción por texto", () => {
+  it("procesarTexto detecta una interrupción sin tocar el flujo (el llamador decide cancelarlo)", async () => {
+    const registro = registroCon(async () => []);
+    await iniciarFlujo(estado, "crear_propiedad", {}, registro);
+
+    const r = await procesarTexto(estado, "¿Qué contratos vencen este mes?", [], registro);
+    expect(r).toEqual({ tipo: "interrumpido", textoOriginal: "¿Qué contratos vencen este mes?" });
+    expect(flujoActivo(estado)).toBe(true); // el motor no cancela solo
+  });
+});

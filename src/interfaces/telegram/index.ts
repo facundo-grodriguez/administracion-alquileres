@@ -216,7 +216,7 @@ bot.on("callback_query:data", async (ctx) => {
     const { accion, valor } = parseCallbackFlujo(datos);
     const estadoFlujo = estadoFlujoDe(chatId);
     if (accion === "iniciar" && valor) {
-      await responderFlujo(ctx, iniciarFlujo(estadoFlujo, valor as FlowId));
+      await responderFlujo(ctx, await iniciarFlujo(estadoFlujo, valor as FlowId));
       return;
     }
     if (accion === CALLBACK_CANCELAR && !flujoActivo(estadoFlujo)) {

@@ -12,6 +12,11 @@ function botones(teclado: { inline_keyboard: { text: string; callback_data?: str
   return teclado.inline_keyboard.flat().map((b) => b.callback_data ?? "");
 }
 
+function etiquetas(teclado: { inline_keyboard: { text: string }[][] } | undefined): string[] {
+  if (!teclado) return [];
+  return teclado.inline_keyboard.flat().map((b) => b.text);
+}
+
 describe("esCallbackFlujo / parseCallbackFlujo", () => {
   it("reconoce el prefijo flujo:", () => {
     expect(esCallbackFlujo("flujo:cancelar")).toBe(true);
@@ -55,15 +60,34 @@ describe("renderResultado", () => {
     expect(botones(teclado)).toEqual(["flujo:confirmar", "flujo:cancelar"]);
   });
 
-  it("arma botones de candidatos + crear nuevo + buscar de nuevo", () => {
+  it("listado inicial de existentes (sin buscar): sin botón de 'buscar de nuevo'", () => {
     const resultado: ResultadoFlujo = {
       tipo: "candidatos",
-      texto: "Encontré varias coincidencias:",
+      texto: "¿Quién es el propietario?",
       candidatos: [
         { id: "a", etiqueta: "Juan Pérez" },
         { id: "b", etiqueta: "Juan Gómez" },
       ],
       permiteCrear: "crear_persona",
+      etiquetaCrear: "➕ Crear propietario",
+      esBusqueda: false,
+    };
+    const { teclado } = renderResultado(resultado);
+    expect(botones(teclado)).toEqual(["flujo:sel:0", "flujo:sel:1", "flujo:crear:crear_persona", "flujo:cancelar"]);
+    expect(etiquetas(teclado)).toContain("➕ Crear propietario");
+  });
+
+  it("resultado de una búsqueda real: agrega 'buscar de nuevo' y usa la etiqueta de crear", () => {
+    const resultado: ResultadoFlujo = {
+      tipo: "candidatos",
+      texto: 'Encontré varias coincidencias para "Juan", elegí una:',
+      candidatos: [
+        { id: "a", etiqueta: "Juan Pérez" },
+        { id: "b", etiqueta: "Juan Gómez" },
+      ],
+      permiteCrear: "crear_persona",
+      etiquetaCrear: "➕ Crear inquilino",
+      esBusqueda: true,
     };
     const { teclado } = renderResultado(resultado);
     expect(botones(teclado)).toEqual([
@@ -73,12 +97,25 @@ describe("renderResultado", () => {
       "flujo:buscar_de_nuevo",
       "flujo:cancelar",
     ]);
+    expect(etiquetas(teclado)).toContain("➕ Crear inquilino");
   });
 
-  it("no repite candidatos ni crear-nuevo cuando no hay coincidencias", () => {
-    const resultado: ResultadoFlujo = { tipo: "candidatos", texto: "No encontré nada.", candidatos: [] };
+  it("sin etiquetaCrear, usa el texto genérico '➕ Crear nuevo'", () => {
+    const resultado: ResultadoFlujo = {
+      tipo: "candidatos",
+      texto: "No encontré nada.",
+      candidatos: [],
+      permiteCrear: "crear_persona",
+      esBusqueda: true,
+    };
     const { teclado } = renderResultado(resultado);
-    expect(botones(teclado)).toEqual(["flujo:buscar_de_nuevo", "flujo:cancelar"]);
+    expect(etiquetas(teclado)).toContain("➕ Crear nuevo");
+  });
+
+  it("listado inicial vacío (nadie cargado todavía) sin permiteCrear: solo cancelar", () => {
+    const resultado: ResultadoFlujo = { tipo: "candidatos", texto: "¿Quién es?", candidatos: [], esBusqueda: false };
+    const { teclado } = renderResultado(resultado);
+    expect(botones(teclado)).toEqual(["flujo:cancelar"]);
   });
 
   it("un resultado completado sin botones post-acción no trae teclado", () => {
@@ -91,6 +128,12 @@ describe("renderResultado", () => {
     const { texto, teclado } = renderResultado({ tipo: "cancelado", texto: "Cancelado." });
     expect(texto).toBe("Cancelado.");
     expect(teclado).toBeUndefined();
+  });
+
+  it("confirmar_cancelacion arma los botones de sí/continuar, sin cancelar recursivo", () => {
+    const { texto, teclado } = renderResultado({ tipo: "confirmar_cancelacion", texto: "¿Estás seguro?" });
+    expect(texto).toBe("¿Estás seguro?");
+    expect(botones(teclado)).toEqual(["flujo:cancelar_si", "flujo:continuar"]);
   });
 
   it("agrega el botón de Omitir solo cuando el campo es opcional", () => {

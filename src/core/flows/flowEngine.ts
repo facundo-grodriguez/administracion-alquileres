@@ -14,9 +14,17 @@ import type {
 import { etiquetaKey } from "./types.js";
 import { parseFechaUsuario, parseMontoUsuario, parseNumeroUsuario, parsePeriodoUsuario } from "./validadores.js";
 
-const MAX_CANDIDATOS = 5;
+/** Tope de resultados al buscar por texto (el usuario ya escribió algo, se puede acotar más). */
+const MAX_CANDIDATOS_BUSQUEDA = 5;
+/** Tope del listado inicial de existentes al entrar a un paso "entidad" (antes de escribir nada). */
+const MAX_CANDIDATOS_LISTADO = 8;
+
+const TEXTO_CONFIRMAR_CANCELACION =
+  "¿Estás seguro de que querés cancelar esta carga? Se va a perder todo lo que cargaste hasta ahora.";
 
 export const CALLBACK_CANCELAR = "cancelar";
+export const CALLBACK_CANCELAR_CONFIRMADO = "cancelar_si";
+export const CALLBACK_CONTINUAR = "continuar";
 export const CALLBACK_CONFIRMAR = "confirmar";
 export const CALLBACK_OMITIR = "omitir";
 export const CALLBACK_HOY = "hoy";
@@ -69,8 +77,21 @@ function pistaFormato(campo: CampoFlujo): string {
   }
 }
 
-/** Recorre desde `frame.pasoActual` saltando los pasos condicionales, y renderiza el primero que corresponde mostrar. */
-function renderDesde(estado: FlowState, registro: RegistroFlujos): ResultadoFlujo {
+/** Quita del texto cualquier línea que sea exactamente el marcador `(id: ...)` — pensado para que
+ * la IA lo use internamente al encadenar tool calls, nunca para mostrárselo al usuario. El flujo
+ * guiado no pasa por la IA, así que tiene que limpiarlo él mismo antes de mostrar el resultado. */
+function limpiarMarcadorId(texto: string): string {
+  return texto
+    .split("\n")
+    .filter((linea) => !/^\(id: [^)]+\)$/.test(linea.trim()))
+    .join("\n")
+    .trimEnd();
+}
+
+/** Recorre desde `frame.pasoActual` saltando los pasos condicionales, y renderiza el primero que
+ * corresponde mostrar. Si es un paso "entidad" recién alcanzado, muestra de entrada el listado de
+ * existentes (botones) en vez de esperar a que el usuario escriba algo para buscar. */
+async function renderDesde(estado: FlowState, registro: RegistroFlujos): Promise<ResultadoFlujo> {
   const frame = tope(estado);
   if (!frame) return { tipo: "sin_flujo" };
   const definicion = registro[frame.flowId];
@@ -82,6 +103,20 @@ function renderDesde(estado: FlowState, registro: RegistroFlujos): ResultadoFluj
       continue;
     }
     frame.candidatosPendientes = undefined;
+
+    if (paso.campo.tipo === "entidad") {
+      const candidatos = (await paso.campo.buscar("")).slice(0, MAX_CANDIDATOS_LISTADO);
+      frame.candidatosPendientes = candidatos;
+      return {
+        tipo: "candidatos",
+        texto: paso.pregunta(frame.datos),
+        candidatos,
+        permiteCrear: paso.campo.crear,
+        etiquetaCrear: paso.campo.etiquetaCrear,
+        esBusqueda: false,
+      };
+    }
+
     return renderPaso(frame, paso);
   }
 
@@ -92,9 +127,9 @@ function renderDesde(estado: FlowState, registro: RegistroFlujos): ResultadoFluj
 }
 
 /** Avanza al próximo paso (tras resolver el actual) y renderiza. */
-function siguientePaso(estado: FlowState, registro: RegistroFlujos): ResultadoFlujo {
+function siguientePaso(estado: FlowState, registro: RegistroFlujos): Promise<ResultadoFlujo> {
   const frame = tope(estado);
-  if (!frame) return { tipo: "sin_flujo" };
+  if (!frame) return Promise.resolve({ tipo: "sin_flujo" });
   frame.pasoActual += 1;
   return renderDesde(estado, registro);
 }
@@ -104,19 +139,22 @@ export function iniciarFlujo(
   flowId: FlowId,
   datosIniciales: DatosFlujo = {},
   registro: RegistroFlujos = FLUJOS,
-): ResultadoFlujo {
+): Promise<ResultadoFlujo> {
   estado.pila.push({ flowId, pasoActual: 0, datos: datosIniciales });
   return renderDesde(estado, registro);
 }
 
-/** Inicia un sub-flujo de alta inline (ej. crear una persona nueva en medio de crear_contrato). */
+/** Inicia un sub-flujo de alta inline (ej. crear una persona nueva en medio de crear_contrato).
+ * `datosIniciales` precarga campos ya conocidos por contexto (ej. el rol de la persona) para no
+ * volver a preguntarlos — se copia para no mutar el objeto compartido de la definición del paso. */
 function iniciarSubFlujo(
   estado: FlowState,
   flowId: FlowId,
   campoDestino: string,
   registro: RegistroFlujos,
-): ResultadoFlujo {
-  estado.pila.push({ flowId, pasoActual: 0, datos: {}, campoDestino });
+  datosIniciales: DatosFlujo = {},
+): Promise<ResultadoFlujo> {
+  estado.pila.push({ flowId, pasoActual: 0, datos: { ...datosIniciales }, campoDestino });
   return renderDesde(estado, registro);
 }
 
@@ -148,7 +186,11 @@ async function finalizarFrameSuperior(estado: FlowState, registro: RegistroFlujo
     return siguientePaso(estado, registro);
   }
 
-  return { tipo: "completado", texto: resultadoTexto, botonesPostAccion: definicion.botonesPostAccion };
+  return {
+    tipo: "completado",
+    texto: limpiarMarcadorId(resultadoTexto),
+    botonesPostAccion: definicion.botonesPostAccion,
+  };
 }
 
 /**
@@ -206,7 +248,7 @@ export async function procesarTexto(
       return siguientePaso(estado, registro);
     }
     case "entidad": {
-      const candidatos = (await paso.campo.buscar(texto.trim())).slice(0, MAX_CANDIDATOS);
+      const candidatos = (await paso.campo.buscar(texto.trim())).slice(0, MAX_CANDIDATOS_BUSQUEDA);
       frame.candidatosPendientes = candidatos;
       if (candidatos.length === 1) {
         resolverEntidad(frame, paso, candidatos[0]!);
@@ -216,7 +258,14 @@ export async function procesarTexto(
         candidatos.length === 0
           ? `No encontré nada para "${texto.trim()}".`
           : `Encontré varias coincidencias para "${texto.trim()}", elegí una:`;
-      return { tipo: "candidatos", texto: textoResultado, candidatos, permiteCrear: paso.campo.crear };
+      return {
+        tipo: "candidatos",
+        texto: textoResultado,
+        candidatos,
+        permiteCrear: paso.campo.crear,
+        etiquetaCrear: paso.campo.etiquetaCrear,
+        esBusqueda: true,
+      };
     }
     // "opciones" y "confirmacion" no aceptan texto libre — ya se filtró como interrupción arriba
     // si correspondía; si no, es simplemente un formato inválido para este paso.
@@ -235,13 +284,22 @@ export async function procesarSeleccion(
   const frame = tope(estado);
   if (!frame) return { tipo: "sin_flujo" };
 
+  // Cancelar pide confirmación primero (ver CALLBACK_CANCELAR_CONFIRMADO/CALLBACK_CONTINUAR) — no
+  // toca el frame todavía, así que no hace falta resolver el paso actual para esto.
   if (accion === CALLBACK_CANCELAR) {
+    return { tipo: "confirmar_cancelacion", texto: TEXTO_CONFIRMAR_CANCELACION };
+  }
+  if (accion === CALLBACK_CANCELAR_CONFIRMADO) {
     estado.pila.length = 0;
     return { tipo: "cancelado", texto: "Cancelado." };
   }
 
   const paso = pasoActualDe(frame, registro);
   if (!paso) return renderDesde(estado, registro);
+
+  if (accion === CALLBACK_CONTINUAR) {
+    return renderPaso(frame, paso);
+  }
 
   if (accion === CALLBACK_CONFIRMAR && paso.campo.tipo === "confirmacion") {
     return finalizarFrameSuperior(estado, registro);
@@ -279,7 +337,7 @@ export async function procesarSeleccion(
   }
 
   if (accion === "crear" && paso.campo.tipo === "entidad" && paso.campo.crear) {
-    return iniciarSubFlujo(estado, paso.campo.crear, paso.id, registro);
+    return iniciarSubFlujo(estado, paso.campo.crear, paso.id, registro, paso.campo.datosCrear);
   }
 
   return renderPaso(frame, paso);

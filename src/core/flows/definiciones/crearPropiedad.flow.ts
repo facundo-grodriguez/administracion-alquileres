@@ -17,8 +17,14 @@ export const crearPropiedadFlow: DefinicionFlujo = {
     { id: "direccion", pregunta: () => "¿Dirección completa de la propiedad?", campo: { tipo: "texto" } },
     {
       id: "propietario_id",
-      pregunta: () => "¿Quién es el propietario? Escribí el nombre o DNI para buscarlo.",
-      campo: { tipo: "entidad", buscar: buscarPersonasParaFlujo(), crear: "crear_persona" },
+      pregunta: () => "¿Quién es el propietario? Elegí uno de la lista o escribí el nombre/DNI para buscar otro.",
+      campo: {
+        tipo: "entidad",
+        buscar: buscarPersonasParaFlujo(),
+        crear: "crear_persona",
+        datosCrear: { tipo_persona: "propietario" },
+        etiquetaCrear: "➕ Crear propietario",
+      },
     },
     {
       id: "tipo_opcion",
