@@ -14,6 +14,7 @@ Para la vista completa por versión (qué está hecho y qué falta, todo junto) 
 | 6 | [Consulta de garantes y seguros/impuestos alimentando el balance](etapa-6-garantes-y-balance.md) | ✅ Completada |
 | 7 | [Modelo simplificado + actualización automática por IPC](etapa-7-modelo-simplificado-y-actualizacion-automatica.md) | 🟡 Código listo, falta cargar `RAPIDAPI_KEY` |
 | 8 | [Botones interactivos contextuales (Telegram)](etapa-8-botones-interactivos.md) | ✅ Completada |
+| 9 | [Flujos guiados por máquina de estados (sin OpenAI)](etapa-9-flujos-guiados.md) | ✅ Completada |
 
 ## Convención
 

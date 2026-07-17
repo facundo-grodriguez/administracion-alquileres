@@ -2,6 +2,9 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.0.0] — 2026-07-17 — Etapa 9
+Flujos guiados por máquina de estados (`src/core/flows`) para las 6 altas del asistente (persona, propiedad, contrato, pago, gasto, Seguro Finaer): se completan 100% por botones/texto corto, sin ninguna llamada a OpenAI, reutilizando exactamente las mismas tools que usa la IA. Soporta sub-flujos anidados (crear una persona o propiedad nueva sin salir del alta de un contrato) y detecta si el usuario abandonó el flujo a mitad de camino para derivarlo al asistente. Los 4 accesos fijos del menú principal (Propiedades/Contratos/Pagos/Resumen) también dejaron de pasar por OpenAI. De paso se corrigió un alias de import (`@/config/env.js`) inconsistente con el resto del proyecto. Ver [`docs/etapa-9-flujos-guiados.md`](docs/etapa-9-flujos-guiados.md).
+
 ## [8.0.0] — 2026-07-16 — Etapa 8
 Botones interactivos contextuales en Telegram: menú principal fijo (Reply Keyboard) + 12 teclados contextuales (Inline Keyboard) que cambian según el momento de la conversación — inferidos automáticamente tras un alta exitosa (`crear_propiedad`/`crear_contrato`/`crear_recibo`/`crear_gasto`), o señalados por el modelo con la tool `sugerir_botones` para preguntas de opción múltiple. Nueva tool `consultar_contrato`. El texto libre sigue funcionando igual en todo momento. Fix de un bug preexistente en `buscar_persona` (el filtro `rol` no encontraba personas recién asignadas por primera vez). Ver [`docs/etapa-8-botones-interactivos.md`](docs/etapa-8-botones-interactivos.md).
 

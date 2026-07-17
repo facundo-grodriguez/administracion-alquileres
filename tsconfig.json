@@ -14,10 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": false,
-    "sourceMap": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "sourceMap": true
   },
   "include": ["src", "scripts", "tests", "drizzle.config.ts"],
   "exclude": ["node_modules", "dist"]

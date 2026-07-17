@@ -15,6 +15,10 @@ export async function obtenerPropiedadPorId(id: string): Promise<Propiedad | und
   return db.query.propiedades.findFirst({ where: eq(propiedades.id, id) });
 }
 
+export async function listarPropiedades(): Promise<PropiedadConPropietario[]> {
+  return db.query.propiedades.findMany({ with: { propietario: true } }) as Promise<PropiedadConPropietario[]>;
+}
+
 export async function actualizarCarpetaDrive(id: string, url: string): Promise<Propiedad | undefined> {
   const filas = await db.update(propiedades).set({ carpetaDriveUrl: url }).where(eq(propiedades.id, id)).returning();
   return filas[0];

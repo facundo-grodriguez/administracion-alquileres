@@ -1,5 +1,5 @@
 import type { CompletionUsage } from "openai/resources/completions";
-import { env } from "@/config/env.js";
+import { env } from "../../config/env.js";
 
 // USD por 1M tokens. Fuente: developers.openai.com/api/docs/pricing (verificado en vivo).
 // Si se usa un modelo no listado acá, se muestran los tokens igual, sin costo estimado.

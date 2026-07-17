@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { env } from "@/config/env.js";
+import { env } from "../../config/env.js";
 
 export const DOCUMENTOS_BUCKET = "documentos";
 

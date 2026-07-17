@@ -11,15 +11,18 @@ export const menuPrincipalKeyboard = new Keyboard()
   .text("📊 Resumen")
   .resized();
 
-/** Los botones del menú principal (Reply Keyboard) llegan como texto normal — se traducen acá. */
-export const TEXTO_MENU_PRINCIPAL: Record<string, string> = {
-  "🏠 Propiedades": "Mostrame mis propiedades",
-  "📄 Contratos": "Mostrame mis contratos",
-  "💰 Pagos": "¿Qué tengo pendiente de cobrar este mes?",
-  "➕ Nueva carga":
-    "¿Qué querés cargar? Preguntame si es una persona, propiedad, contrato, pago o gasto, y guiame paso a paso.",
-  "📊 Resumen": "Dame el resumen completo de la agenda",
-};
+// Los 5 botones del menú principal (Reply Keyboard) llegan como texto normal. Desde la etapa 9,
+// los 5 se resuelven sin IA (4 con una llamada directa al backend, "➕ Nueva carga" abriendo el
+// selector de flujos guiados) — ver `respuestaMenuDirecto`/`tecladoNuevaCarga` en `index.ts`. Esta
+// lista solo se usa para reconocer esas frases como "no es una interrupción real, es el menú" al
+// detectar si el usuario abandonó un flujo guiado a mitad de camino.
+export const ETIQUETAS_MENU_PRINCIPAL = [
+  "🏠 Propiedades",
+  "📄 Contratos",
+  "💰 Pagos",
+  "➕ Nueva carga",
+  "📊 Resumen",
+] as const;
 
 type Boton = { texto: string; datos: string };
 
