@@ -40,6 +40,11 @@ const envSchema = z.object({
   SUPABASE_URL: opcional,
   SUPABASE_SERVICE_ROLE_KEY: opcional,
 
+  // ARquilerAPI (RapidAPI): actualización automática de alquileres por IPC. Opcional — si falta,
+  // la tool de actualización avisa que no está configurada en vez de romper el resto del bot.
+  RAPIDAPI_KEY: opcional,
+  RAPIDAPI_HOST: z.string().default("arquilerapi1.p.rapidapi.com"),
+
   // Activa el log de uso/costo de cada llamada a OpenAI (tokens de entrada/salida/total + costo
   // estimado) por consola. Pensado para desarrollo, no para producción (es ruidoso).
   DEBUG_AI: z

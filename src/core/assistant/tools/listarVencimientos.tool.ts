@@ -13,9 +13,9 @@ function diasTexto(dias: number): string {
 export const listarVencimientosTool = defineTool({
   name: "listar_vencimientos",
   description:
-    "Lista vencimientos dentro de un rango de fechas: fin de contratos, seguros e impuestos/servicios. " +
-    "Usar para '¿qué contratos vencen este mes?', '¿qué seguros tengo que renovar?', '¿qué vence esta semana?'. " +
-    "El filtro 'tipo' acota a un solo tipo de vencimiento.",
+    "Lista vencimientos dentro de un rango de fechas: fin de contratos, gastos de propiedad, Seguro Finaer " +
+    "y contratos con actualización de alquiler pendiente. Usar para '¿qué contratos vencen este mes?', " +
+    "'¿qué gastos tengo que pagar?', '¿qué vence esta semana?'. El filtro 'tipo' acota a un solo tipo.",
   inputSchema: z.object({
     desde: z.string().optional().describe("Fecha de inicio del rango, formato YYYY-MM-DD. Por defecto, hoy."),
     hasta: z
@@ -23,7 +23,7 @@ export const listarVencimientosTool = defineTool({
       .optional()
       .describe("Fecha de fin del rango, formato YYYY-MM-DD. Por defecto, 30 días desde 'desde'."),
     tipo: z
-      .enum(["contrato", "seguro", "impuesto_servicio"])
+      .enum(["contrato", "gasto", "finaer", "actualizacion_alquiler"])
       .optional()
       .describe("Filtrar por tipo. Si se omite, incluye todos."),
   }),

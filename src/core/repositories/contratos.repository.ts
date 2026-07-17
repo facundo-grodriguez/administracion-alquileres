@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { contratos, contratosGarantes } from "../db/schema.js";
 
@@ -55,4 +55,31 @@ export async function listarContratosVigentes() {
     where: eq(contratos.estado, "vigente"),
     with: conRelaciones,
   });
+}
+
+export async function listarFinaerPorVencer(desde: string, hasta: string) {
+  return db.query.contratos.findMany({
+    where: and(
+      eq(contratos.finaerActivo, true),
+      isNotNull(contratos.finaerFechaVencimiento),
+      gte(contratos.finaerFechaVencimiento, desde),
+      lte(contratos.finaerFechaVencimiento, hasta),
+    ),
+    with: conRelaciones,
+  });
+}
+
+/** Carga o actualiza los datos del Seguro Finaer de un contrato (forma parte del contrato, no es una tabla aparte). */
+export async function actualizarFinaer(
+  id: string,
+  datos: {
+    finaerActivo: boolean;
+    finaerNumeroPoliza?: string;
+    finaerFechaInicio?: string;
+    finaerFechaVencimiento?: string;
+    finaerObservaciones?: string;
+  },
+): Promise<Contrato | undefined> {
+  const filas = await db.update(contratos).set(datos).where(eq(contratos.id, id)).returning();
+  return filas[0];
 }

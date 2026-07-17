@@ -5,7 +5,7 @@ import * as personasRepo from "../repositories/personas.repository.js";
 import * as propiedadesRepo from "../repositories/propiedades.repository.js";
 import { formatoPeriodoAR, hoyISO } from "../util/fecha.js";
 
-type ContratoConRelaciones = NonNullable<Awaited<ReturnType<typeof contratosRepo.buscarContratoPorId>>>;
+export type ContratoConRelaciones = NonNullable<Awaited<ReturnType<typeof contratosRepo.buscarContratoPorId>>>;
 type EstadoPago = "pendiente" | "pagado" | "atrasado" | "parcial";
 
 export type ResultadoEstadoPago =
@@ -24,7 +24,7 @@ export type ResultadoEstadoPago =
       monto: string | null;
     };
 
-async function resolverContrato(
+export async function resolverContrato(
   inquilinoOPropiedad: string,
 ): Promise<
   { contrato: ContratoConRelaciones } | { ambiguo: string[] } | { sinContratoVigente: string } | { noEncontrado: true }
@@ -128,6 +128,7 @@ export async function crearRecibo(input: {
   monto: string;
   fechaPago: string;
   medioPago?: string;
+  observaciones?: string;
 }) {
   const contrato = await contratosRepo.buscarContratoPorId(input.contratoId);
   if (!contrato) throw new Error(`No existe el contrato ${input.contratoId}`);
@@ -138,7 +139,13 @@ export async function crearRecibo(input: {
   const pago = existente
     ? // Si ya había una fila para este período (ej: se está corrigiendo un pago cargado antes),
       // actualiza también el monto — antes quedaba pisado en silencio con el valor viejo.
-      await pagosRepo.registrarPagoRecibido(existente.id, input.fechaPago, input.monto, input.medioPago)
+      await pagosRepo.registrarPagoRecibido(
+        existente.id,
+        input.fechaPago,
+        input.monto,
+        input.medioPago,
+        input.observaciones,
+      )
     : await pagosRepo.crearPago({
         contratoId: input.contratoId,
         periodo: periodoDate,
@@ -147,6 +154,7 @@ export async function crearRecibo(input: {
         fechaPago: input.fechaPago,
         estado: "pagado",
         medioPago: input.medioPago,
+        observaciones: input.observaciones,
       });
 
   if (pago?.fechaPago) {

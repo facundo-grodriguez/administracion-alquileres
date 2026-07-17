@@ -17,6 +17,7 @@ export const crearReciboTool = defineTool({
     monto: z.string().describe("Monto pagado, ej: '150000'"),
     fecha_pago: z.string().describe("YYYY-MM-DD"),
     medio_pago: z.string().optional().describe("Ej: transferencia, efectivo"),
+    observaciones: z.string().optional(),
   }),
   run: async (input) => {
     const { pago, contrato } = await pagosService.crearRecibo({
@@ -25,6 +26,7 @@ export const crearReciboTool = defineTool({
       monto: input.monto,
       fechaPago: input.fecha_pago,
       medioPago: input.medio_pago,
+      observaciones: input.observaciones,
     });
     if (!pago) return "No se pudo registrar el pago.";
     return [
@@ -34,7 +36,10 @@ export const crearReciboTool = defineTool({
       `Período: ${formatoPeriodoAR(input.periodo)}`,
       `Importe: ${formatoARS(pago.monto)}`,
       `Medio de pago: ${pago.medioPago ?? "no especificado"}`,
+      pago.observaciones ? `Observaciones: ${pago.observaciones}` : null,
       "Estado: Pagado",
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

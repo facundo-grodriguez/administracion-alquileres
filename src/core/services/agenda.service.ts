@@ -1,4 +1,3 @@
-import * as reparacionesRepo from "../repositories/reparaciones.repository.js";
 import { formatoFechaAR, hoyISO, sumarDiasISO } from "../util/fecha.js";
 import { formatoARS } from "../util/formato.js";
 import * as pagosService from "./pagos.service.js";
@@ -7,7 +6,6 @@ import * as vencimientosService from "./vencimientos.service.js";
 export type ResumenAgenda = {
   cobrosPendientes: Awaited<ReturnType<typeof pagosService.resumenCobrosDelMes>>;
   vencimientos: Awaited<ReturnType<typeof vencimientosService.listarVencimientos>>;
-  reparacionesAbiertas: Awaited<ReturnType<typeof reparacionesRepo.listarAbiertas>>;
 };
 
 /**
@@ -17,15 +15,14 @@ export type ResumenAgenda = {
 export async function obtenerResumenAgenda(horizonteDias = 30): Promise<ResumenAgenda> {
   const hasta = sumarDiasISO(hoyISO(), horizonteDias);
 
-  const [cobros, vencimientos, reparacionesAbiertas] = await Promise.all([
+  const [cobros, vencimientos] = await Promise.all([
     pagosService.resumenCobrosDelMes(),
     vencimientosService.listarVencimientos(undefined, hasta),
-    reparacionesRepo.listarAbiertas(),
   ]);
 
   const cobrosPendientes = cobros.filter((c) => c.estado !== "pagado");
 
-  return { cobrosPendientes, vencimientos, reparacionesAbiertas };
+  return { cobrosPendientes, vencimientos };
 }
 
 function diasTexto(diasRestantes: number): string {
@@ -36,9 +33,9 @@ function diasTexto(diasRestantes: number): string {
 }
 
 export function formatearResumenAgenda(resumen: ResumenAgenda): string {
-  const { cobrosPendientes, vencimientos, reparacionesAbiertas } = resumen;
+  const { cobrosPendientes, vencimientos } = resumen;
 
-  if (cobrosPendientes.length === 0 && vencimientos.length === 0 && reparacionesAbiertas.length === 0) {
+  if (cobrosPendientes.length === 0 && vencimientos.length === 0) {
     return `📅 Agenda (${hoyISO()})\n\nNo hay nada pendiente. Todo al día. ✅`;
   }
 
@@ -58,11 +55,6 @@ export function formatearResumenAgenda(resumen: ResumenAgenda): string {
         `  • ${v.descripcion} — ${v.propiedad} — ${formatoFechaAR(v.fechaVencimiento)} (${diasTexto(v.diasRestantes)})`,
     );
     bloques.push(`⏰ Vencimientos próximos (${vencimientos.length}):\n${lineas.join("\n")}`);
-  }
-
-  if (reparacionesAbiertas.length > 0) {
-    const lineas = reparacionesAbiertas.map((r) => `  • ${r.descripcion} — ${r.propiedad.direccion} (${r.estado})`);
-    bloques.push(`🔧 Reparaciones abiertas (${reparacionesAbiertas.length}):\n${lineas.join("\n")}`);
   }
 
   return bloques.join("\n\n");

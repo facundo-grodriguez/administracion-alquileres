@@ -1,8 +1,8 @@
 # Asistente de administración de alquileres (bot de Telegram)
 
-Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes), contratos, cobros, seguros, impuestos/servicios, reparaciones (con proveedor asignado), documentación (links a Google Drive) y control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
+Bot de Telegram para centralizar la gestión de un portfolio de alquileres: propiedades, personas (inquilinos/propietarios/garantes con Seguro Finaer), contratos con actualización automática del alquiler por IPC, cobros y gastos de la propiedad (expensas, ABL, ARBA, servicios, seguros — todos en un mismo lugar) con control financiero básico. Entiende preguntas en lenguaje natural usando la API de OpenAI (function calling), contra una base Postgres (Supabase), y manda un resumen de agenda proactivo una vez por día.
 
-**Versión actual: v6** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — interfaz web y WhatsApp, confirmadas para más adelante).
+**Versión actual: v7** (ver [docs/roadmap.md](docs/roadmap.md) para el detalle de qué se hizo en cada etapa y qué queda pendiente — interfaz web y WhatsApp, confirmadas para más adelante). Reparaciones, proveedores y documentación están deshabilitados por diseño (modelo simplificado) — el código sigue en el repo, ver `docs/roadmap.md`.
 
 ## Requisitos
 
@@ -28,6 +28,7 @@ Bot de Telegram para centralizar la gestión de un portfolio de alquileres: prop
    - `DATABASE_URL` (la connection string del paso anterior)
    - `TELEGRAM_BOT_TOKEN` (el del paso 2)
    - `TELEGRAM_ALLOWED_USER_IDS` se completa en el paso 7
+   - `RAPIDAPI_KEY` (opcional — sin ella, la actualización automática de alquiler por IPC avisa que no está configurada en vez de romper el resto del bot; se obtiene suscribiéndose a [ARquilerAPI en RapidAPI](https://rapidapi.com/jmpagella-nzr1LmjkbSI/api/arquilerapi1))
 
    ```sh
    cp .env.example .env
@@ -60,21 +61,19 @@ Bot de Telegram para centralizar la gestión de un portfolio de alquileres: prop
 - "¿Qué tengo pendiente hoy?"
 - "¿Está pago el alquiler de Juan?"
 - "¿Qué alquileres están atrasados?"
-- "¿Qué seguros tengo que renovar?"
 - "¿Qué vence esta semana?"
-- "¿Qué reparaciones tengo abiertas?"
-- "Cargá un seguro de La Caja para [propiedad] que vence el 30/08"
+- "¿Quién es garante de Juan?"
+- "¿Corresponde actualizar el alquiler de Juan?"
 - "Dá de alta a Pedro Fernández como nueva persona, DNI 32111222"
-- "Cargá una reparación en [propiedad]: se rompió tal cosa, la hace [proveedor], costo 50000"
-- "Buscame un plomero en [zona]"
+- "Cargá un gasto de expensas en [propiedad]: vence el 30/08, monto 50000"
+- "Marcá como pagado el ABL de [propiedad]"
 - "¿Quién paga el internet de [propiedad], el propietario o el inquilino?"
-- "Vinculá la carpeta de Drive de [propiedad]: [link]"
-- "Mostrame la documentación de [propiedad]"
+- "Cargá el Seguro Finaer del contrato de [inquilino]: póliza FIN-123, vence el 01/01"
 - "¿Cómo viene el balance de [propiedad] este mes?"
 
 ### Comandos del bot
 
-- `/agenda` — resumen completo: alquileres a cobrar, vencimientos próximos (contratos, seguros, impuestos/servicios) y reparaciones abiertas
+- `/agenda` — resumen completo: alquileres a cobrar y vencimientos próximos (contratos, gastos de propiedad, Seguro Finaer, actualizaciones de alquiler pendientes)
 - `/enviar_agenda` — dispara el recordatorio diario en el momento (para probarlo)
 - `/reset` — empezar una conversación nueva (borra el historial de esa charla)
 - `/ayuda` — ayuda
@@ -112,9 +111,9 @@ La familia más nueva `gpt-5.6` (tiers `sol` / `terra` / `luna`) puede devolver 
 src/
   config/env.ts                # validación de variables de entorno
   core/
-    db/                        # schema Drizzle, cliente de DB, cliente de Storage (fase 2)
+    db/                        # schema Drizzle, cliente de DB
     repositories/               # acceso tipado a cada tabla
-    services/                   # lógica de negocio (pagos, vencimientos, agenda, reparaciones, movimientos financieros)
+    services/                   # lógica de negocio (pagos, vencimientos, agenda, gastos, actualización de alquiler)
     assistant/
       systemPrompt.ts
       openaiClient.ts
@@ -142,7 +141,8 @@ El core (`src/core`) es agnóstico de interfaz: Telegram y la CLI son capas delg
 - **v3 — Proveedores, documentación y financiero**: proveedores asignables a reparaciones, comprobantes adjuntos, responsable de pago en obligaciones, documentación con links a Drive, balance de ingresos/gastos por propiedad.
 - **v4 — Lenguaje de negocio**: nunca muestra IDs internos ni fechas ISO; confirmaciones completas en lenguaje de administración inmobiliaria, con formato uniforme.
 - **v5 — Deploy 24/7**: modo webhook + `render.yaml` para correr en Render sin depender de que el administrador tenga la PC prendida.
-- **v6 — Garantes y balance** *(actual)*: consulta de garantes por chat; seguros e impuestos/servicios se pueden marcar como pagados y se reflejan solos en el balance financiero.
+- **v6 — Garantes y balance**: consulta de garantes por chat; seguros e impuestos/servicios se pueden marcar como pagados y se reflejan solos en el balance financiero.
+- **v7 — Modelo simplificado + IPC** *(actual)*: gastos de propiedad unificados en una sola tabla; Seguro Finaer como parte del contrato; actualización automática del alquiler por IPC; reparaciones/proveedores/documentación deshabilitados.
 
 Detalle completo de cada etapa en [`docs/`](docs/README.md).
 
@@ -151,4 +151,4 @@ Detalle completo de cada etapa en [`docs/`](docs/README.md).
 - Interfaz web: panel de solo lectura (agenda, balance, listados), reutilizando `src/core` sin cambios.
 - WhatsApp como canal adicional (costo no es problema para este volumen, pero requiere verificación de Meta Business).
 
-Edición/borrado de datos, subida real de archivos y recordatorios por-evento escalados se evaluaron y se descartaron por ahora — ver [docs/roadmap.md](docs/roadmap.md) para el detalle de por qué.
+Edición/borrado de datos, recordatorios por-evento escalados, reparaciones/proveedores/documentación (deshabilitados, no eliminados) se evaluaron y se descartaron o pausaron por ahora — ver [docs/roadmap.md](docs/roadmap.md) para el detalle de por qué.

@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   date,
   index,
   integer,
@@ -10,6 +11,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -33,18 +35,28 @@ export const tipoDocumentoEnum = pgEnum("tipo_documento", [
   "inventario",
   "otro",
 ]);
-export const tipoImpuestoServicioEnum = pgEnum("tipo_impuesto_servicio", [
+export const tipoGastoEnum = pgEnum("tipo_gasto", [
+  "expensas",
   "ABL",
   "ARBA",
   "luz",
   "gas",
   "agua",
-  "expensas",
   "internet",
+  "seguro_hogar",
+  "seguro_incendio",
   "otro",
 ]);
+export const estadoGastoEnum = pgEnum("estado_gasto", ["pendiente", "pagado"]);
 export const tipoMovimientoFinancieroEnum = pgEnum("tipo_movimiento_financiero", ["ingreso", "gasto"]);
 export const responsablePagoEnum = pgEnum("responsable_pago", ["propietario", "inquilino"]);
+export const indiceActualizacionEnum = pgEnum("indice_actualizacion", ["IPC", "ICL"]);
+export const frecuenciaActualizacionEnum = pgEnum("frecuencia_actualizacion", [
+  "mensual",
+  "trimestral",
+  "semestral",
+  "anual",
+]);
 
 // personas: inquilinos, propietarios, garantes y administradores. El rol no es un campo fijo:
 // se infiere de dónde se referencia a la persona (propietarioId de una propiedad, inquilinoId
@@ -119,11 +131,19 @@ export const contratos = pgTable(
     fechaInicio: date("fecha_inicio").notNull(),
     fechaFin: date("fecha_fin").notNull(),
     valorAlquilerInicial: numeric("valor_alquiler_inicial", { precision: 12, scale: 2 }).notNull(),
-    indiceActualizacion: varchar("indice_actualizacion", { length: 60 }),
+    indiceActualizacion: indiceActualizacionEnum("indice_actualizacion"),
+    frecuenciaActualizacion: frecuenciaActualizacionEnum("frecuencia_actualizacion"),
     diaVencimientoPago: integer("dia_vencimiento_pago").notNull().default(10),
     deposito: numeric("deposito", { precision: 12, scale: 2 }),
     estado: estadoContratoEnum("estado").notNull().default("vigente"),
     observaciones: text("observaciones"),
+    // Seguro Finaer: forma parte del contrato (no es una entidad aparte). El estado
+    // (vigente/vencido) se deriva de finaerFechaVencimiento, no se guarda.
+    finaerActivo: boolean("finaer_activo").notNull().default(false),
+    finaerNumeroPoliza: varchar("finaer_numero_poliza", { length: 80 }),
+    finaerFechaInicio: date("finaer_fecha_inicio"),
+    finaerFechaVencimiento: date("finaer_fecha_vencimiento"),
+    finaerObservaciones: text("finaer_observaciones"),
     ...timestamps,
   },
   (t) => [index("contratos_fecha_fin_idx").on(t.fechaFin), index("contratos_propiedad_idx").on(t.propiedadId)],
@@ -143,16 +163,22 @@ export const contratosGarantes = pgTable(
   (t) => [primaryKey({ columns: [t.contratoId, t.personaId] })],
 );
 
-export const actualizacionesContrato = pgTable("actualizaciones_contrato", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  contratoId: uuid("contrato_id")
-    .notNull()
-    .references(() => contratos.id, { onDelete: "cascade" }),
-  fechaVigencia: date("fecha_vigencia").notNull(),
-  valorNuevo: numeric("valor_nuevo", { precision: 12, scale: 2 }).notNull(),
-  indiceAplicado: varchar("indice_aplicado", { length: 60 }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+// Historial de recalculos de alquiler (IPC/ICL). Una fila por período de actualización ya
+// aplicado; "último valor vigente" = la fila con fechaVigencia más reciente para el contrato.
+export const actualizacionesContrato = pgTable(
+  "actualizaciones_contrato",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    contratoId: uuid("contrato_id")
+      .notNull()
+      .references(() => contratos.id, { onDelete: "cascade" }),
+    fechaVigencia: date("fecha_vigencia").notNull(),
+    valorNuevo: numeric("valor_nuevo", { precision: 12, scale: 2 }).notNull(),
+    indiceAplicado: varchar("indice_aplicado", { length: 60 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("actualizaciones_contrato_contrato_fecha_key").on(t.contratoId, t.fechaVigencia)],
+);
 
 export const pagos = pgTable(
   "pagos",
@@ -169,49 +195,33 @@ export const pagos = pgTable(
     estado: estadoPagoEnum("estado").notNull().default("pendiente"),
     medioPago: varchar("medio_pago", { length: 60 }),
     documentoId: uuid("documento_id").references(() => documentos.id),
+    observaciones: text("observaciones"),
     ...timestamps,
   },
   (t) => [index("pagos_periodo_estado_idx").on(t.periodo, t.estado), index("pagos_contrato_idx").on(t.contratoId)],
 );
 
-export const seguros = pgTable(
-  "seguros",
+// Reemplaza a las antiguas tablas "seguros" e "impuestos_servicios" (etapas 2/3): un solo lugar
+// para cualquier gasto recurrente de la propiedad (expensas, ABL, ARBA, servicios, seguros, etc.)
+// en vez de una tabla por rubro — mismo flujo de alta para todo.
+export const gastosPropiedad = pgTable(
+  "gastos_propiedad",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     propiedadId: uuid("propiedad_id")
       .notNull()
       .references(() => propiedades.id, { onDelete: "cascade" }),
-    compania: text("compania").notNull(),
-    numeroPoliza: varchar("numero_poliza", { length: 80 }),
-    fechaInicio: date("fecha_inicio").notNull(),
-    fechaVencimiento: date("fecha_vencimiento").notNull(),
-    fechaPago: date("fecha_pago"),
-    costo: numeric("costo", { precision: 12, scale: 2 }),
-    documentoId: uuid("documento_id").references(() => documentos.id),
-    observaciones: text("observaciones"),
-    ...timestamps,
-  },
-  (t) => [index("seguros_fecha_vencimiento_idx").on(t.fechaVencimiento)],
-);
-
-export const impuestosServicios = pgTable(
-  "impuestos_servicios",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    propiedadId: uuid("propiedad_id")
-      .notNull()
-      .references(() => propiedades.id, { onDelete: "cascade" }),
-    tipo: tipoImpuestoServicioEnum("tipo").notNull(),
+    tipo: tipoGastoEnum("tipo").notNull(),
     responsable: responsablePagoEnum("responsable"),
-    numeroCuenta: varchar("numero_cuenta", { length: 80 }),
+    monto: numeric("monto", { precision: 12, scale: 2 }),
+    periodicidad: varchar("periodicidad", { length: 40 }),
     fechaVencimiento: date("fecha_vencimiento").notNull(),
     fechaPago: date("fecha_pago"),
-    periodicidad: varchar("periodicidad", { length: 40 }),
-    montoEstimado: numeric("monto_estimado", { precision: 12, scale: 2 }),
+    estado: estadoGastoEnum("estado").notNull().default("pendiente"),
     observaciones: text("observaciones"),
     ...timestamps,
   },
-  (t) => [index("impuestos_servicios_fecha_vencimiento_idx").on(t.fechaVencimiento)],
+  (t) => [index("gastos_propiedad_fecha_vencimiento_idx").on(t.fechaVencimiento)],
 );
 
 export const reparaciones = pgTable("reparaciones", {
@@ -276,8 +286,7 @@ export const proveedoresRelations = relations(proveedores, ({ many }) => ({
 export const propiedadesRelations = relations(propiedades, ({ one, many }) => ({
   propietario: one(personas, { fields: [propiedades.propietarioId], references: [personas.id] }),
   contratos: many(contratos),
-  seguros: many(seguros),
-  impuestosServicios: many(impuestosServicios),
+  gastos: many(gastosPropiedad),
   reparaciones: many(reparaciones),
   movimientosFinancieros: many(movimientosFinancieros),
 }));
@@ -304,13 +313,8 @@ export const pagosRelations = relations(pagos, ({ one }) => ({
   documento: one(documentos, { fields: [pagos.documentoId], references: [documentos.id] }),
 }));
 
-export const segurosRelations = relations(seguros, ({ one }) => ({
-  propiedad: one(propiedades, { fields: [seguros.propiedadId], references: [propiedades.id] }),
-  documento: one(documentos, { fields: [seguros.documentoId], references: [documentos.id] }),
-}));
-
-export const impuestosServiciosRelations = relations(impuestosServicios, ({ one }) => ({
-  propiedad: one(propiedades, { fields: [impuestosServicios.propiedadId], references: [propiedades.id] }),
+export const gastosPropiedadRelations = relations(gastosPropiedad, ({ one }) => ({
+  propiedad: one(propiedades, { fields: [gastosPropiedad.propiedadId], references: [propiedades.id] }),
 }));
 
 export const reparacionesRelations = relations(reparaciones, ({ one }) => ({

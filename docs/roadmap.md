@@ -12,6 +12,7 @@ Vista rápida de qué versión del asistente está en producción, qué se const
 | v4 | 4 — Lenguaje de negocio | El asistente deja de mostrar IDs internos, UUIDs y fechas en formato ISO en cualquier respuesta (chat y digest diario). Confirmaciones de alta completas (propiedad, inquilino, montos, fechas en DD/MM/AAAA) con formato uniforme: confirmación → info principal → datos relevantes → próximo paso sugerido. | [etapa-4-ux-lenguaje-de-negocio.md](etapa-4-ux-lenguaje-de-negocio.md) |
 | v5 | 5 — Deploy 24/7 | Modo webhook + `render.yaml` + ping externo (GitHub Actions) para correr en Render free tier sin depender de la PC del administrador. Deploy confirmado funcionando. | [etapa-5-deploy-24-7.md](etapa-5-deploy-24-7.md) |
 | v6 | 6 — Garantes y balance | Consulta de garantes por chat. Seguros e impuestos/servicios pueden marcarse como pagados y se reflejan solos en el balance financiero (ya no aparecen como vencimiento pendiente una vez pagados). | [etapa-6-garantes-y-balance.md](etapa-6-garantes-y-balance.md) |
+| v7 | 7 — Modelo simplificado + actualización por IPC | Seguros e impuestos/servicios unificados en una sola tabla de "gastos de propiedad". Seguro Finaer pasa a ser parte del contrato. Actualización automática del alquiler por IPC (`actualizar_alquiler`), sin gastar la API si todavía no corresponde. Reparaciones, proveedores y documentación quedan deshabilitados (código intacto). | [etapa-7-modelo-simplificado-y-actualizacion-automatica.md](etapa-7-modelo-simplificado-y-actualizacion-automatica.md) |
 
 Además, entre etapas se hizo una **QA general** del proyecto (revisión de arquitectura, corrección de 2 bugs reales — monto no actualizado al corregir un pago, digest marcado como enviado aunque fallaran todos los envíos —, eliminación de código muerto, límite de tokens/temperatura estandarizado en el único call site de OpenAI, logger de uso/costo por `DEBUG_AI=true`) y una **migración de infraestructura** (Node 18 → 22+/24, limpieza de datos de prueba duplicados en la base).
 
@@ -24,14 +25,23 @@ Revisadas explícitamente con el usuario en la etapa 6. Confirmadas para más ad
 | **Interfaz web** | Nueva capa en `src/interfaces/web` (panel de **solo lectura**: agenda, balance, listados — sin repetir el asistente de IA), reutilizando `src/core` sin cambios. | Confirmada, alcance a definir cuando se planifique. |
 | **WhatsApp** como canal adicional | Nueva capa en `src/interfaces`, análoga a Telegram, vía Cloud API de Meta. | Confirmada como candidata; costo no es impedimento (conversaciones iniciadas por el usuario son gratis e ilimitadas, el único mensaje proactivo diario cuesta fracciones de centavo) pero requiere verificación de Meta Business — más fricción de setup que Telegram. |
 
-Descartadas explícitamente por el usuario en la etapa 6 (no son bugs ni gaps, son decisiones de alcance):
+Deshabilitadas en la etapa 7 (código y schema intactos en el repo, solo no registradas en `tools/index.ts`/`systemPrompt.ts` — reactivarlas no requiere reescribir nada, solo volver a registrarlas):
+
+| Módulo | Por qué se apagó |
+|---|---|
+| Reparaciones | Fuera del modelo simplificado que pidió el usuario; prioriza menos módulos para el chat. |
+| Proveedores | Solo tenía sentido junto con reparaciones. |
+| Documentación (Drive) | Idem — se puede reactivar como upgrade si hace falta. |
+
+Descartadas explícitamente por el usuario (no son bugs ni gaps, son decisiones de alcance):
 
 | Candidata | Por qué se descartó |
 |---|---|
-| Edición y borrado de propiedades/personas/proveedores/contratos | Prefiere que dependa del mantenimiento manual (Supabase directo) o que sea un upgrade si se lo piden más adelante. |
-| Subida real de archivos (Supabase Storage) | Los links a Google Drive de la etapa 3 ya cubren el caso de uso; no hace falta manejar archivos binarios. |
+| Edición y borrado de propiedades/personas/proveedores/contratos | Prefiere que dependa del mantenimiento manual (Supabase directo) o que sea un upgrade si se lo piden más adelante. Única excepción: `cargar_seguro_finaer` (etapa 7), acotada a los campos de Finaer de un contrato existente. |
+| Subida real de archivos (Supabase Storage) | Los links a Google Drive ya cubrían el caso de uso; ahora tampoco aplica porque documentación está deshabilitada. |
 | Recordatorios por-evento escalados | El digest diario de la etapa 2 ya alcanza. |
 | Email como canal adicional | Telegram (y eventualmente WhatsApp) cubren el uso actual. |
+| Actualización automática por ICL | La integración de la etapa 7 es específica de IPC; ICL queda fuera por ahora. |
 
 ## Convención de versión
 

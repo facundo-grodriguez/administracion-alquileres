@@ -1,18 +1,14 @@
 import "dotenv/config";
-import { eq } from "drizzle-orm";
 import { db } from "../src/core/db/client.js";
 import {
+  actualizacionesContrato,
   contratos,
   contratosGarantes,
-  documentos,
-  impuestosServicios,
+  gastosPropiedad,
   movimientosFinancieros,
   pagos,
   personas,
   propiedades,
-  proveedores,
-  reparaciones,
-  seguros,
 } from "../src/core/db/schema.js";
 import { hoyISO, sumarDiasISO } from "../src/core/util/fecha.js";
 
@@ -26,12 +22,7 @@ async function seed() {
   const propietario = unico(
     await db
       .insert(personas)
-      .values({
-        nombreCompleto: "Roberto Gómez",
-        dni: "20123456",
-        telefono: "1122334455",
-        email: "roberto@example.com",
-      })
+      .values({ nombreCompleto: "Roberto Gómez", dni: "20123456", telefono: "1122334455" })
       .returning(),
   );
 
@@ -42,13 +33,6 @@ async function seed() {
       .returning(),
   );
 
-  const maria = unico(
-    await db
-      .insert(personas)
-      .values({ nombreCompleto: "María López", dni: "28998877", telefono: "1199887766" })
-      .returning(),
-  );
-
   const garante = unico(
     await db
       .insert(personas)
@@ -56,83 +40,47 @@ async function seed() {
       .returning(),
   );
 
-  const plomero = unico(
-    await db
-      .insert(proveedores)
-      .values({
-        nombre: "Plomería Fontana",
-        categoria: "plomero",
-        telefono: "1144556677",
-        zona: "Caseros",
-        horarios: "Lun a Vie 8 a 18hs",
-        confianza: 5,
-        observaciones: "Responde rápido, buenos precios",
-      })
-      .returning(),
-  );
-
-  const gasista = unico(
-    await db
-      .insert(proveedores)
-      .values({ nombre: "Gas Sur", categoria: "gasista", telefono: "1155889900", zona: "Palermo", confianza: 4 })
-      .returning(),
-  );
-
-  const propiedadCaseros = unico(
+  const propiedad = unico(
     await db
       .insert(propiedades)
-      .values({
-        direccion: "Av. Rivadavia 1234",
-        zona: "Caseros",
-        propietarioId: propietario.id,
-        tipo: "departamento",
-        carpetaDriveUrl: "https://drive.google.com/drive/folders/ejemplo-caseros",
-      })
-      .returning(),
-  );
-
-  const propiedadPalermo = unico(
-    await db
-      .insert(propiedades)
-      .values({ direccion: "Guatemala 5678, 3B", zona: "Palermo", propietarioId: propietario.id, tipo: "departamento" })
-      .returning(),
-  );
-
-  const propiedadBelgrano = unico(
-    await db
-      .insert(propiedades)
-      .values({ direccion: "Cabildo 2500, 4A", zona: "Belgrano", propietarioId: propietario.id, tipo: "departamento" })
+      .values({ direccion: "Av. Rivadavia 1234", zona: "Caseros", propietarioId: propietario.id, tipo: "departamento" })
       .returning(),
   );
 
   const hoy = hoyISO();
   const periodoActual = hoy.slice(0, 7);
 
-  const contratoJuan = unico(
+  // Contrato con índice IPC trimestral (para probar actualizar_alquiler) y Seguro Finaer cargado.
+  const contrato = unico(
     await db
       .insert(contratos)
       .values({
-        propiedadId: propiedadCaseros.id,
+        propiedadId: propiedad.id,
         inquilinoId: juan.id,
         fechaInicio: sumarDiasISO(hoy, -180),
-        fechaFin: sumarDiasISO(hoy, 185),
+        fechaFin: sumarDiasISO(hoy, 550),
         valorAlquilerInicial: "150000",
         diaVencimientoPago: 10,
-        indiceActualizacion: "ICL",
+        indiceActualizacion: "IPC",
+        frecuenciaActualizacion: "trimestral",
         deposito: "150000",
         estado: "vigente",
+        finaerActivo: true,
+        finaerNumeroPoliza: "FIN-2026-001",
+        finaerFechaInicio: sumarDiasISO(hoy, -180),
+        finaerFechaVencimiento: sumarDiasISO(hoy, 10),
       })
       .returning(),
   );
 
-  await db.insert(contratosGarantes).values({ contratoId: contratoJuan.id, personaId: garante.id });
+  await db.insert(contratosGarantes).values({ contratoId: contrato.id, personaId: garante.id });
 
   // Juan ya pagó el período actual → obtener_estado_pago debe mostrar "PAGADO".
-  const pagoJuan = unico(
+  const pago = unico(
     await db
       .insert(pagos)
       .values({
-        contratoId: contratoJuan.id,
+        contratoId: contrato.id,
         periodo: `${periodoActual}-01`,
         monto: "150000",
         fechaVencimiento: `${periodoActual}-10`,
@@ -143,147 +91,69 @@ async function seed() {
       .returning(),
   );
 
-  await db.insert(contratos).values({
-    propiedadId: propiedadPalermo.id,
-    inquilinoId: maria.id,
-    fechaInicio: sumarDiasISO(hoy, -90),
-    fechaFin: sumarDiasISO(hoy, 275),
-    valorAlquilerInicial: "180000",
-    diaVencimientoPago: 5,
-    indiceActualizacion: "IPC",
-    deposito: "180000",
-    estado: "vigente",
-  });
-  // María no tiene recibo cargado para el período actual: si el día 5 ya pasó,
-  // obtener_estado_pago / listar atrasados la va a mostrar como ATRASADO de forma automática.
-
-  await db.insert(contratos).values({
-    propiedadId: propiedadBelgrano.id,
-    inquilinoId: maria.id,
-    fechaInicio: sumarDiasISO(hoy, -300),
-    fechaFin: sumarDiasISO(hoy, 15),
-    valorAlquilerInicial: "200000",
-    diaVencimientoPago: 1,
-    indiceActualizacion: "ICL",
-    deposito: "200000",
-    estado: "vigente",
-  });
-  // Este contrato vence en 15 días → aparece en listar_vencimientos / el resumen de agenda.
-
-  // Seguro por vencer en 20 días → aparece en la agenda y en "¿qué seguros tengo que renovar?".
-  await db.insert(seguros).values({
-    propiedadId: propiedadCaseros.id,
-    compania: "La Caja",
-    numeroPoliza: "POL-99887",
-    fechaInicio: sumarDiasISO(hoy, -345),
-    fechaVencimiento: sumarDiasISO(hoy, 20),
-    costo: "45000",
-  });
-
-  // ABL por vencer en 8 días, a cargo del propietario → aparece en la agenda / impuestos por vencer.
-  await db.insert(impuestosServicios).values({
-    propiedadId: propiedadPalermo.id,
-    tipo: "ABL",
-    responsable: "propietario",
-    numeroCuenta: "123-456789-0",
-    fechaVencimiento: sumarDiasISO(hoy, 8),
-    periodicidad: "bimestral",
-    montoEstimado: "32000",
-  });
-
-  // Internet a cargo del inquilino → ejemplo de obligación con responsable distinto al ABL.
-  await db.insert(impuestosServicios).values({
-    propiedadId: propiedadPalermo.id,
-    tipo: "internet",
-    responsable: "inquilino",
-    fechaVencimiento: sumarDiasISO(hoy, 12),
-    periodicidad: "mensual",
-    montoEstimado: "18000",
-  });
-
-  // Reparación abierta, con proveedor asignado → aparece en la agenda / "¿qué reparaciones tengo abiertas?".
-  const reparacionBano = unico(
+  // ABL por vencer en 8 días, a cargo del propietario → aparece en la agenda.
+  const abl = unico(
     await db
-      .insert(reparaciones)
+      .insert(gastosPropiedad)
       .values({
-        propiedadId: propiedadBelgrano.id,
-        proveedorId: plomero.id,
-        fecha: sumarDiasISO(hoy, -3),
-        descripcion: "Pérdida de agua en el baño",
-        costo: "80000",
-        estado: "pendiente",
+        propiedadId: propiedad.id,
+        tipo: "ABL",
+        responsable: "propietario",
+        fechaVencimiento: sumarDiasISO(hoy, 8),
+        periodicidad: "bimestral",
+        monto: "32000",
       })
       .returning(),
   );
 
-  // Documento puntual de una propiedad (contrato) y comprobante de la reparación anterior.
-  await db.insert(documentos).values({
-    entidadTipo: "propiedad",
-    entidadId: propiedadCaseros.id,
-    tipoDocumento: "contrato",
-    storagePath: "https://drive.google.com/file/d/ejemplo-contrato-caseros/view",
-    nombreArchivo: "Contrato_Caseros.pdf",
+  // Seguro hogar ya pagado → ejemplo de gasto resuelto, no debería aparecer en vencimientos.
+  await db.insert(gastosPropiedad).values({
+    propiedadId: propiedad.id,
+    tipo: "seguro_hogar",
+    fechaVencimiento: sumarDiasISO(hoy, 300),
+    fechaPago: sumarDiasISO(hoy, -5),
+    estado: "pagado",
+    monto: "45000",
+    observaciones: "La Caja, póliza POL-99887",
   });
 
-  const comprobante = unico(
-    await db
-      .insert(documentos)
-      .values({
-        entidadTipo: "reparacion",
-        entidadId: reparacionBano.id,
-        tipoDocumento: "comprobante",
-        storagePath: "https://drive.google.com/file/d/ejemplo-factura-plomeria/view",
-        nombreArchivo: "Factura_Plomeria.pdf",
-      })
-      .returning(),
-  );
-  await db
-    .update(reparaciones)
-    .set({ comprobanteDocumentoId: comprobante.id })
-    .where(eq(reparaciones.id, reparacionBano.id));
+  // Historial de una actualización de alquiler ya aplicada (deja el próximo cálculo pendiente).
+  await db.insert(actualizacionesContrato).values({
+    contratoId: contrato.id,
+    fechaVigencia: sumarDiasISO(hoy, -90),
+    valorNuevo: "150000",
+    indiceAplicado: "IPC",
+  });
 
-  // Movimientos financieros: dos "espejo" de lo que generaría el flujo real (pago + reparación
-  // con costo) más uno manual, para tener ambos casos representados en los datos de prueba.
+  // Movimientos financieros: el ingreso del pago de Juan (tal como lo generaría el flujo real)
+  // más un gasto manual, para tener ambos casos representados en los datos de prueba.
   await db.insert(movimientosFinancieros).values([
     {
-      propiedadId: propiedadCaseros.id,
+      propiedadId: propiedad.id,
       tipo: "ingreso",
       categoria: "alquiler",
-      monto: pagoJuan.monto,
-      fecha: pagoJuan.fechaPago!,
+      monto: pago.monto,
+      fecha: pago.fechaPago!,
       referenciaTipo: "pago",
-      referenciaId: pagoJuan.id,
+      referenciaId: pago.id,
       descripcion: `Alquiler ${periodoActual} — ${juan.nombreCompleto}`,
     },
     {
-      propiedadId: propiedadBelgrano.id,
-      tipo: "gasto",
-      categoria: "reparacion",
-      monto: reparacionBano.costo!,
-      fecha: reparacionBano.fecha,
-      referenciaTipo: "reparacion",
-      referenciaId: reparacionBano.id,
-      descripcion: reparacionBano.descripcion,
-    },
-    {
-      propiedadId: propiedadPalermo.id,
+      propiedadId: propiedad.id,
       tipo: "gasto",
       categoria: "otro",
-      monto: "95000",
+      monto: "20000",
       fecha: sumarDiasISO(hoy, -10),
-      descripcion: "Compra de aire acondicionado",
+      descripcion: "Compra de bombita de luz de escalera",
     },
   ]);
 
   console.log("Listo. Datos de prueba cargados:");
   console.log(`  Propietario: ${propietario.nombreCompleto}`);
-  console.log(`  Inquilinos: ${juan.nombreCompleto}, ${maria.nombreCompleto}`);
-  console.log(
-    `  Propiedades: ${propiedadCaseros.direccion}, ${propiedadPalermo.direccion}, ${propiedadBelgrano.direccion}`,
-  );
-  console.log(`  Proveedores: ${plomero.nombre}, ${gasista.nombre}`);
-  console.log("  Documentos: contrato de Caseros, comprobante de la reparación de Belgrano");
-  console.log("  Movimientos financieros: 3 (alquiler cobrado, reparación, gasto manual)");
+  console.log(`  Inquilino: ${juan.nombreCompleto} (garante: ${garante.nombreCompleto})`);
+  console.log(`  Propiedad: ${propiedad.direccion}`);
+  console.log(`  Gastos: ABL pendiente (id ${abl.id}), seguro hogar pagado`);
+  console.log("  Seguro Finaer cargado en el contrato, vence en 10 días");
 }
 
 seed()

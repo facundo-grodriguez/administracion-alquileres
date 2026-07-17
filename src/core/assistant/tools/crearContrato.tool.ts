@@ -10,7 +10,9 @@ export const crearContratoTool = defineTool({
   name: "crear_contrato",
   description:
     "Da de alta un contrato de alquiler. Requiere IDs de propiedad e inquilino ya existentes " +
-    "(usar buscar_propiedad / buscar_persona / crear_persona primero).",
+    "(usar buscar_propiedad / buscar_persona / crear_persona primero). Siempre preguntá la frecuencia " +
+    "de actualización del alquiler, no la asumas. Si el contrato tiene Seguro Finaer, se puede cargar acá " +
+    "o después con cargar_seguro_finaer.",
   inputSchema: z.object({
     propiedad_id: z.string(),
     inquilino_id: z.string(),
@@ -18,6 +20,10 @@ export const crearContratoTool = defineTool({
     fecha_inicio: z.string().describe("YYYY-MM-DD"),
     fecha_fin: z.string().describe("YYYY-MM-DD"),
     valor_alquiler: z.string().describe("Valor mensual del alquiler, ej: '150000'"),
+    frecuencia_actualizacion: z
+      .enum(["mensual", "trimestral", "semestral", "anual"])
+      .describe("Cada cuánto se actualiza el alquiler. Preguntala siempre, no la asumas."),
+    indice_actualizacion: z.enum(["IPC", "ICL"]).optional().describe("Índice con el que se actualiza el alquiler"),
     dia_vencimiento_pago: z
       .number()
       .int()
@@ -25,9 +31,11 @@ export const crearContratoTool = defineTool({
       .max(28)
       .optional()
       .describe("Día del mes en que vence el pago. Por defecto 10."),
-    indice_actualizacion: z.string().optional().describe("Ej: IPC, ICL"),
     deposito: z.string().optional(),
     observaciones: z.string().optional(),
+    finaer_numero_poliza: z.string().optional().describe("Si tiene Seguro Finaer, su número de póliza"),
+    finaer_fecha_inicio: z.string().optional().describe("YYYY-MM-DD"),
+    finaer_fecha_vencimiento: z.string().optional().describe("YYYY-MM-DD"),
   }),
   run: async (input) => {
     const contrato = await contratosRepo.crearContrato(
@@ -37,10 +45,15 @@ export const crearContratoTool = defineTool({
         fechaInicio: input.fecha_inicio,
         fechaFin: input.fecha_fin,
         valorAlquilerInicial: input.valor_alquiler,
-        diaVencimientoPago: input.dia_vencimiento_pago ?? 10,
+        frecuenciaActualizacion: input.frecuencia_actualizacion,
         indiceActualizacion: input.indice_actualizacion,
+        diaVencimientoPago: input.dia_vencimiento_pago ?? 10,
         deposito: input.deposito,
         observaciones: input.observaciones,
+        finaerActivo: Boolean(input.finaer_numero_poliza || input.finaer_fecha_vencimiento),
+        finaerNumeroPoliza: input.finaer_numero_poliza,
+        finaerFechaInicio: input.finaer_fecha_inicio,
+        finaerFechaVencimiento: input.finaer_fecha_vencimiento,
       },
       input.garante_ids ?? [],
     );
@@ -56,6 +69,8 @@ export const crearContratoTool = defineTool({
       `Finalización: ${formatoFechaAR(contrato.fechaFin)}`,
       `Alquiler inicial: ${formatoARS(contrato.valorAlquilerInicial)}`,
       `Vencimiento mensual: día ${contrato.diaVencimientoPago}`,
+      `Actualización: ${contrato.frecuenciaActualizacion}${contrato.indiceActualizacion ? ` por ${contrato.indiceActualizacion}` : ""}`,
+      contrato.finaerActivo ? "Seguro Finaer: cargado" : null,
       `(id: ${contrato.id})`,
     ]
       .filter(Boolean)

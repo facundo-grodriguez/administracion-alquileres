@@ -17,10 +17,11 @@ export async function registrarPagoRecibido(
   fechaPago: string,
   monto: string,
   medioPago?: string,
+  observaciones?: string,
 ): Promise<Pago | undefined> {
   const [pago] = await db
     .update(pagos)
-    .set({ estado: "pagado", fechaPago, monto, medioPago, updatedAt: new Date() })
+    .set({ estado: "pagado", fechaPago, monto, medioPago, observaciones, updatedAt: new Date() })
     .where(eq(pagos.id, pagoId))
     .returning();
   return pago;
