@@ -2,6 +2,13 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.1.1] — 2026-10-11 — Fix de estabilidad en modo webhook
+Un error dentro de un handler (ej. la base de datos inaccesible) tumbaba el proceso entero en Render:
+en modo webhook grammY no pasa por `bot.catch` y la promesa rechazada quedaba sin capturar, además de
+que Telegram reintentaba el mismo update en loop. Ahora el servidor HTTP captura el error, lo loguea
+(solo el mensaje, sin el `ctx` que incluía el token del bot) y responde 200. Se agrega además un handler
+global de `unhandledRejection`.
+
 ## [9.1.0] — 2026-07-17 — QA v9
 Ajustes a los flujos guiados de la etapa 9, a partir de una ronda de prueba real por Telegram:
 (1) el texto final de cada alta ya no muestra el `(id: ...)` interno; (2) `crear_persona` standalone

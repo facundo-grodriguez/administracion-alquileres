@@ -258,6 +258,11 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.catch((err) => console.error("Error no capturado del bot:", err.error));
 
+// Red de seguridad: un rechazo de promesa suelto (ej. la base caída) se loguea en vez de matar el proceso.
+process.on("unhandledRejection", (motivo) => {
+  console.error("Promesa rechazada sin capturar:", motivo instanceof Error ? motivo.message : motivo);
+});
+
 if (autorizados.size === 0) {
   console.warn(
     "Aviso: TELEGRAM_ALLOWED_USER_IDS está vacío, así que nadie está autorizado todavía. " +
@@ -283,7 +288,17 @@ if (webhookUrl) {
   const puerto = Number(process.env.PORT) || 3000;
   const servidor = createServer((req, res) => {
     if (req.method === "POST" && req.url === "/telegram-webhook") {
-      manejarWebhook(req, res);
+      // En webhook, grammY no pasa por bot.catch: si un handler falla, la promesa rechaza y
+      // (sin este catch) tumba el proceso. Se responde 200 igual para que Telegram no reintente
+      // el mismo update en loop. Se loguea solo el mensaje (el ctx del error incluye el token).
+      Promise.resolve(manejarWebhook(req, res)).catch((err: unknown) => {
+        const causa = (err as { error?: unknown })?.error ?? err;
+        console.error("Error procesando update de Telegram:", causa instanceof Error ? causa.message : causa);
+        if (!res.headersSent) {
+          res.writeHead(200);
+          res.end();
+        }
+      });
       return;
     }
     res.writeHead(200, { "Content-Type": "text/plain" });
