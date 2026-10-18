@@ -103,7 +103,7 @@ async function vencimientosTexto(tipo?: "actualizacion_alquiler"): Promise<Respu
     (v) =>
       `• ${v.descripcion} — ${v.propiedad} — ${formatoFechaAR(v.fechaVencimiento)} (${diasTexto(v.diasRestantes)})${v.monto ? ` — ${formatoARS(v.monto)}` : ""}`,
   );
-  const hayVencidas = tipo && items.some((v) => v.diasRestantes <= 0);
+  const hayVencidas = items.some((v) => v.tipo === "actualizacion_alquiler" && v.diasRestantes <= 0);
   return {
     texto: `${tipo ? "⚡ Actualizaciones de alquiler" : "📆 Vencimientos (30 días)"}:\n\n${lineas.join("\n")}`,
     teclado: botonOtraConsulta(hayVencidas ? tecladoAlquilerActual() : undefined),

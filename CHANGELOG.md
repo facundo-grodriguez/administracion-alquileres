@@ -2,6 +2,10 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.2.1] — 2026-10-18 — Botón de alquiler actual en Vencimientos
+La consulta "📆 Vencimientos (30 días)" ahora también ofrece el botón "⚡ Cargar alquiler actual" cuando
+hay una actualización de alquiler vencida (antes solo aparecía en "⚡ Actualizaciones de alquiler").
+
 ## [9.2.0] — 2026-10-18 — Consultas, pagos anteriores y alquiler actual
 - **🔎 Consultas**: botón nuevo en el menú principal que junta todas las consultas con botones, sin
   pasar por OpenAI — cobros del mes, meses sin pago, historial de pagos por contrato, detalle de un
