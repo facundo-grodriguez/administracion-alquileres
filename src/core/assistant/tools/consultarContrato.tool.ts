@@ -1,9 +1,45 @@
 import { z } from "zod";
 import * as actualizacionesRepo from "../../repositories/actualizacionesContrato.repository.js";
+import type { ContratoConRelaciones } from "../../services/pagos.service.js";
 import * as pagosService from "../../services/pagos.service.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
+
+/** Detalle de un contrato en lenguaje de negocio (lo usan la tool y el menú de Consultas). */
+export async function detalleContratoTexto(contrato: ContratoConRelaciones): Promise<string> {
+  const ultimaActualizacion = await actualizacionesRepo.obtenerUltima(contrato.id);
+  const valorVigente = ultimaActualizacion?.valorNuevo ?? contrato.valorAlquilerInicial;
+
+  const garantes =
+    contrato.garantes.length === 0
+      ? "sin garantes cargados"
+      : contrato.garantes.map((g) => g.persona.nombreCompleto).join(", ");
+
+  const actualizacionTxt = contrato.frecuenciaActualizacion
+    ? `${contrato.frecuenciaActualizacion}${contrato.indiceActualizacion ? ` por ${contrato.indiceActualizacion}` : " (sin índice asignado)"}`
+    : "sin configurar";
+
+  const finaerTxt = contrato.finaerActivo
+    ? `cargado${contrato.finaerNumeroPoliza ? ` (póliza ${contrato.finaerNumeroPoliza})` : ""}${contrato.finaerFechaVencimiento ? `, vence ${formatoFechaAR(contrato.finaerFechaVencimiento)}` : ""}`
+    : "no cargado";
+
+  return [
+    `Propiedad: ${contrato.propiedad.direccion}`,
+    `Inquilino: ${contrato.inquilino.nombreCompleto}`,
+    `Garantes: ${garantes}`,
+    `Inicio: ${formatoFechaAR(contrato.fechaInicio)}`,
+    `Finalización: ${formatoFechaAR(contrato.fechaFin)}`,
+    `Alquiler inicial: ${formatoARS(contrato.valorAlquilerInicial)}`,
+    ultimaActualizacion
+      ? `Valor vigente: ${formatoARS(valorVigente)} (desde ${formatoFechaAR(ultimaActualizacion.fechaVigencia)}${ultimaActualizacion.indiceAplicado === "manual" ? ", cargado a mano" : ""})`
+      : null,
+    `Actualización: ${actualizacionTxt}`,
+    `Seguro Finaer: ${finaerTxt}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 export const consultarContratoTool = defineTool({
   name: "consultar_contrato",
@@ -25,37 +61,6 @@ export const consultarContratoTool = defineTool({
       return `${resolucion.sinContratoVigente} no tiene un contrato vigente actualmente.`;
     }
 
-    const { contrato } = resolucion;
-    const ultimaActualizacion = await actualizacionesRepo.obtenerUltima(contrato.id);
-    const valorVigente = ultimaActualizacion?.valorNuevo ?? contrato.valorAlquilerInicial;
-
-    const garantes =
-      contrato.garantes.length === 0
-        ? "sin garantes cargados"
-        : contrato.garantes.map((g) => g.persona.nombreCompleto).join(", ");
-
-    const actualizacionTxt = contrato.frecuenciaActualizacion
-      ? `${contrato.frecuenciaActualizacion}${contrato.indiceActualizacion ? ` por ${contrato.indiceActualizacion}` : " (sin índice asignado)"}`
-      : "sin configurar";
-
-    const finaerTxt = contrato.finaerActivo
-      ? `cargado${contrato.finaerNumeroPoliza ? ` (póliza ${contrato.finaerNumeroPoliza})` : ""}${contrato.finaerFechaVencimiento ? `, vence ${formatoFechaAR(contrato.finaerFechaVencimiento)}` : ""}`
-      : "no cargado";
-
-    return [
-      `Propiedad: ${contrato.propiedad.direccion}`,
-      `Inquilino: ${contrato.inquilino.nombreCompleto}`,
-      `Garantes: ${garantes}`,
-      `Inicio: ${formatoFechaAR(contrato.fechaInicio)}`,
-      `Finalización: ${formatoFechaAR(contrato.fechaFin)}`,
-      `Alquiler inicial: ${formatoARS(contrato.valorAlquilerInicial)}`,
-      ultimaActualizacion
-        ? `Valor vigente: ${formatoARS(valorVigente)} (desde ${formatoFechaAR(ultimaActualizacion.fechaVigencia)})`
-        : null,
-      `Actualización: ${actualizacionTxt}`,
-      `Seguro Finaer: ${finaerTxt}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    return detalleContratoTexto(resolucion.contrato);
   },
 });

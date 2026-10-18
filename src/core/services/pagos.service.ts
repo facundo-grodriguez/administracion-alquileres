@@ -3,7 +3,8 @@ import * as movimientosRepo from "../repositories/movimientosFinancieros.reposit
 import * as pagosRepo from "../repositories/pagos.repository.js";
 import * as personasRepo from "../repositories/personas.repository.js";
 import * as propiedadesRepo from "../repositories/propiedades.repository.js";
-import { formatoPeriodoAR, hoyISO } from "../util/fecha.js";
+import { formatoPeriodoAR, hoyISO, periodosEntre } from "../util/fecha.js";
+import { valorVigente } from "./actualizacionAlquiler.service.js";
 
 export type ContratoConRelaciones = NonNullable<Awaited<ReturnType<typeof contratosRepo.buscarContratoPorId>>>;
 type EstadoPago = "pendiente" | "pagado" | "atrasado" | "parcial";
@@ -66,7 +67,9 @@ async function estadoPeriodoParaContrato(contrato: ContratoConRelaciones, period
     estado,
     fechaVencimiento,
     fechaPago: pagoExistente?.fechaPago ?? null,
-    monto: pagoExistente?.monto ?? contrato.valorAlquilerInicial,
+    // Sin pago cargado, lo que corresponde cobrar es el valor vigente en ese período (con las
+    // actualizaciones ya registradas), no el precio inicial del contrato.
+    monto: pagoExistente?.monto ?? (await valorVigente(contrato, fechaVencimiento)),
   };
 }
 
@@ -206,4 +209,122 @@ export async function resumenCobrosDelMes(): Promise<CobroDelMes[]> {
       };
     }),
   );
+}
+
+export type PeriodoHistorial = {
+  periodo: string;
+  estado: EstadoPago;
+  monto: string;
+  fechaVencimiento: string;
+  fechaPago: string | null;
+};
+
+/**
+ * Estado mes a mes de un contrato, desde su primer mes hasta el mes actual (o el fin del
+ * contrato, si es anterior). Los meses sin pago cargado salen como "atrasado"/"pendiente" según
+ * la fecha de vencimiento, con el valor que correspondía cobrar en ese momento.
+ */
+export async function historialPagos(contrato: ContratoConRelaciones): Promise<PeriodoHistorial[]> {
+  const mesActual = hoyISO().slice(0, 7);
+  const hasta = contrato.fechaFin.slice(0, 7) < mesActual ? contrato.fechaFin.slice(0, 7) : mesActual;
+  const cargados = new Map((await pagosRepo.listarPorContrato(contrato.id)).map((p) => [p.periodo.slice(0, 7), p]));
+
+  return Promise.all(
+    periodosEntre(contrato.fechaInicio.slice(0, 7), hasta).map(async (periodo) => {
+      const pago = cargados.get(periodo);
+      const fechaVencimiento =
+        pago?.fechaVencimiento ?? `${periodo}-${String(contrato.diaVencimientoPago).padStart(2, "0")}`;
+      return {
+        periodo,
+        estado: pago?.estado ?? (fechaVencimiento < hoyISO() ? "atrasado" : "pendiente"),
+        monto: pago?.monto ?? (await valorVigente(contrato, fechaVencimiento)),
+        fechaVencimiento,
+        fechaPago: pago?.fechaPago ?? null,
+      } satisfies PeriodoHistorial;
+    }),
+  );
+}
+
+export type DeudaAnterior = {
+  contratoId: string;
+  inquilino: string;
+  propiedad: string;
+  periodos: PeriodoHistorial[];
+};
+
+/** Meses ANTERIORES al actual que no figuran como pagados, por contrato vigente. */
+export async function deudasMesesAnteriores(): Promise<DeudaAnterior[]> {
+  const mesActual = hoyISO().slice(0, 7);
+  const contratosVigentes = await contratosRepo.listarContratosVigentes();
+  const deudas = await Promise.all(
+    contratosVigentes.map(async (contrato) => ({
+      contratoId: contrato.id,
+      inquilino: contrato.inquilino.nombreCompleto,
+      propiedad: contrato.propiedad.direccion,
+      periodos: (await historialPagos(contrato)).filter((p) => p.periodo < mesActual && p.estado !== "pagado"),
+    })),
+  );
+  return deudas.filter((d) => d.periodos.length > 0);
+}
+
+export type ResultadoPagosAnteriores =
+  | { tipo: "rango_invalido"; motivo: string }
+  | { tipo: "cargado"; cargados: PeriodoHistorial[]; yaPagados: string[] };
+
+const MAX_MESES_CARGA = 36;
+
+/**
+ * Carga de una vez varios meses ya cobrados (para quien empieza a usar el bot con un contrato
+ * que viene de antes). Los meses que ya figuraban pagados no se tocan. Si no se pasa monto, cada
+ * mes toma el valor que correspondía en ese momento; la fecha de pago queda como la de
+ * vencimiento de cada mes.
+ */
+export async function cargarPagosAnteriores(input: {
+  contratoId: string;
+  desde: string;
+  hasta: string;
+  monto?: string;
+  medioPago?: string;
+}): Promise<ResultadoPagosAnteriores> {
+  const contrato = await contratosRepo.buscarContratoPorId(input.contratoId);
+  if (!contrato) throw new Error(`No existe el contrato ${input.contratoId}`);
+
+  const mesActual = hoyISO().slice(0, 7);
+  const inicio = contrato.fechaInicio.slice(0, 7);
+  if (input.desde > input.hasta) return { tipo: "rango_invalido", motivo: "el mes inicial es posterior al final" };
+  if (input.hasta > mesActual) return { tipo: "rango_invalido", motivo: "no se pueden cargar meses futuros" };
+  if (input.desde < inicio) {
+    return { tipo: "rango_invalido", motivo: `el contrato empieza en ${formatoPeriodoAR(inicio)}` };
+  }
+  const periodos = periodosEntre(input.desde, input.hasta);
+  if (periodos.length > MAX_MESES_CARGA) {
+    return { tipo: "rango_invalido", motivo: `son más de ${MAX_MESES_CARGA} meses, cargalos en tandas` };
+  }
+
+  const historial = new Map((await historialPagos(contrato)).map((p) => [p.periodo, p]));
+  const cargados: PeriodoHistorial[] = [];
+  const yaPagados: string[] = [];
+  for (const periodo of periodos) {
+    const actual = historial.get(periodo);
+    if (actual?.estado === "pagado") {
+      yaPagados.push(periodo);
+      continue;
+    }
+    const fechaVencimiento =
+      actual?.fechaVencimiento ?? `${periodo}-${String(contrato.diaVencimientoPago).padStart(2, "0")}`;
+    const monto = input.monto ?? actual?.monto ?? (await valorVigente(contrato, fechaVencimiento));
+    const { pago } = await crearRecibo({
+      contratoId: contrato.id,
+      periodo,
+      monto,
+      // La fecha real de cobro no se conoce: se usa la de vencimiento (o hoy, si todavía no llegó).
+      fechaPago: fechaVencimiento < hoyISO() ? fechaVencimiento : hoyISO(),
+      medioPago: input.medioPago,
+      observaciones: "Carga de pagos anteriores",
+    });
+    if (pago) {
+      cargados.push({ periodo, estado: "pagado", monto: pago.monto, fechaVencimiento, fechaPago: pago.fechaPago });
+    }
+  }
+  return { tipo: "cargado", cargados, yaPagados };
 }

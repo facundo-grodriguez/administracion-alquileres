@@ -33,3 +33,8 @@ export async function buscarPagoPorContratoYPeriodo(contratoId: string, periodo:
     with: conContrato,
   });
 }
+
+/** Todos los pagos cargados de un contrato, del período más viejo al más nuevo. */
+export async function listarPorContrato(contratoId: string): Promise<Pago[]> {
+  return db.query.pagos.findMany({ where: eq(pagos.contratoId, contratoId), orderBy: pagos.periodo });
+}

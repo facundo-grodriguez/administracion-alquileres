@@ -2,8 +2,13 @@ import type { Bot } from "grammy";
 import { schedule } from "node-cron";
 import { env } from "../../config/env.js";
 import * as recordatoriosRepo from "../../core/repositories/recordatorios.repository.js";
-import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
+import {
+  formatearResumenAgenda,
+  hayActualizacionesVencidas,
+  obtenerResumenAgenda,
+} from "../../core/services/agenda.service.js";
 import { hoyISO } from "../../core/util/fecha.js";
+import { TEXTO_AYUDA_ALQUILER_ACTUAL, tecladoAlquilerActual } from "./flowKeyboards.js";
 import { dividirMensaje } from "./util.js";
 
 const TIPO_DIGEST = "digest_diario";
@@ -29,6 +34,9 @@ export async function enviarDigestDiario(bot: Bot, destinos: number[], opciones?
     try {
       for (const parte of dividirMensaje(texto)) {
         await bot.api.sendMessage(chatId, parte);
+      }
+      if (hayActualizacionesVencidas(resumen)) {
+        await bot.api.sendMessage(chatId, TEXTO_AYUDA_ALQUILER_ACTUAL, { reply_markup: tecladoAlquilerActual() });
       }
       algunEnvioExitoso = true;
     } catch (error) {

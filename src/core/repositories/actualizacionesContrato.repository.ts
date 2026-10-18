@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { actualizacionesContrato } from "../db/schema.js";
 
@@ -8,6 +8,20 @@ export type NuevaActualizacionContrato = typeof actualizacionesContrato.$inferIn
 export async function obtenerUltima(contratoId: string): Promise<ActualizacionContrato | undefined> {
   return db.query.actualizacionesContrato.findFirst({
     where: eq(actualizacionesContrato.contratoId, contratoId),
+    orderBy: desc(actualizacionesContrato.fechaVigencia),
+  });
+}
+
+/** La actualización vigente a una fecha dada (la más reciente con fechaVigencia <= fecha). */
+export async function obtenerVigenteAl(
+  contratoId: string,
+  fechaISO: string,
+): Promise<ActualizacionContrato | undefined> {
+  return db.query.actualizacionesContrato.findFirst({
+    where: and(
+      eq(actualizacionesContrato.contratoId, contratoId),
+      lte(actualizacionesContrato.fechaVigencia, fechaISO),
+    ),
     orderBy: desc(actualizacionesContrato.fechaVigencia),
   });
 }

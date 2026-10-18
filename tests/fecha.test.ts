@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diasEntreISO, hoyISO, sumarDiasISO } from "../src/core/util/fecha.js";
+import { diasEntreISO, hoyISO, periodosEntre, sumarDiasISO, ultimaFechaDeAjusteISO } from "../src/core/util/fecha.js";
 
 describe("hoyISO", () => {
   it("devuelve una fecha en formato YYYY-MM-DD", () => {
@@ -40,5 +40,26 @@ describe("diasEntreISO", () => {
 
   it("cruza límites de mes y año", () => {
     expect(diasEntreISO("2026-12-28", "2027-01-07")).toBe(10);
+  });
+});
+
+describe("ultimaFechaDeAjusteISO", () => {
+  it("devuelve el último ajuste que ya pasó según la frecuencia", () => {
+    expect(ultimaFechaDeAjusteISO("2026-02-01", 3, "2026-10-18")).toBe("2026-08-01");
+  });
+  it("incluye el ajuste de hoy", () => {
+    expect(ultimaFechaDeAjusteISO("2026-02-01", 3, "2026-05-01")).toBe("2026-05-01");
+  });
+  it("devuelve undefined si todavía no llegó el primer ajuste", () => {
+    expect(ultimaFechaDeAjusteISO("2026-02-01", 3, "2026-04-30")).toBeUndefined();
+  });
+});
+
+describe("periodosEntre", () => {
+  it("incluye ambos extremos y cruza de año", () => {
+    expect(periodosEntre("2025-11", "2026-02")).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
+  });
+  it("devuelve vacío si el rango está invertido", () => {
+    expect(periodosEntre("2026-03", "2026-02")).toEqual([]);
   });
 });

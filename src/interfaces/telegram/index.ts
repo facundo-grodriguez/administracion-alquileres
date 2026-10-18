@@ -13,8 +13,20 @@ import {
   procesarTexto,
 } from "../../core/flows/flowEngine.js";
 import { crearEstadoFlujo, type FlowId, type FlowState, type ResultadoFlujo } from "../../core/flows/types.js";
-import { formatearResumenAgenda, obtenerResumenAgenda } from "../../core/services/agenda.service.js";
-import { esCallbackFlujo, parseCallbackFlujo, renderResultado, tecladoNuevaCarga } from "./flowKeyboards.js";
+import {
+  formatearResumenAgenda,
+  hayActualizacionesVencidas,
+  obtenerResumenAgenda,
+} from "../../core/services/agenda.service.js";
+import { esCallbackConsulta, responderConsulta, tecladoConsultas } from "./consultas.js";
+import {
+  esCallbackFlujo,
+  parseCallbackFlujo,
+  renderResultado,
+  TEXTO_AYUDA_ALQUILER_ACTUAL,
+  tecladoAlquilerActual,
+  tecladoNuevaCarga,
+} from "./flowKeyboards.js";
 import {
   construirInlineKeyboard,
   ETIQUETAS_MENU_PRINCIPAL,
@@ -69,6 +81,8 @@ const AYUDA = [
   "• ¿Está pago el alquiler de Juan?",
   "• ¿Corresponde actualizar el alquiler de Juan?",
   "• Cargá un gasto de expensas para [propiedad] que vence el 30/08",
+  "",
+  "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
   "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /reset, /ayuda",
@@ -110,7 +124,18 @@ async function responderFlujo(ctx: Context, resultado: ResultadoFlujo): Promise<
   }
 }
 
-/** Los 4 accesos del menú principal que son consultas fijas: se resuelven directo, sin IA. */
+/** Manda la agenda y, si hay actualizaciones de alquiler vencidas, el botón para cargarlas. */
+async function enviarAgenda(ctx: Context): Promise<void> {
+  const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
+  for (const parte of dividirMensaje(formatearResumenAgenda(resumen))) {
+    await ctx.reply(parte, { reply_markup: menuPrincipalKeyboard });
+  }
+  if (hayActualizacionesVencidas(resumen)) {
+    await ctx.reply(TEXTO_AYUDA_ALQUILER_ACTUAL, { reply_markup: tecladoAlquilerActual() });
+  }
+}
+
+/** Los 3 accesos del menú principal que son listados fijos: se resuelven directo, sin IA. */
 async function respuestaMenuDirecto(texto: string): Promise<string | undefined> {
   switch (texto) {
     case "🏠 Propiedades":
@@ -119,8 +144,6 @@ async function respuestaMenuDirecto(texto: string): Promise<string | undefined> 
       return listarContratosVigentesTexto();
     case "💰 Pagos":
       return cobrosDelMesTexto();
-    case "📊 Resumen":
-      return formatearResumenAgenda(await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION));
     default:
       return undefined;
   }
@@ -138,10 +161,7 @@ bot.command("reset", (ctx) => {
 bot.command("agenda", async (ctx) => {
   await ctx.replyWithChatAction("typing");
   try {
-    const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
-    for (const parte of dividirMensaje(formatearResumenAgenda(resumen))) {
-      await ctx.reply(parte);
-    }
+    await enviarAgenda(ctx);
   } catch (error) {
     console.error("Error al obtener la agenda:", error);
     await ctx.reply("No pude leer la agenda. Revisá la conexión a la base de datos.");
@@ -185,6 +205,19 @@ bot.on("message:text", async (ctx) => {
     for (const parte of dividirMensaje(directo)) await ctx.reply(parte, { reply_markup: menuPrincipalKeyboard });
     return;
   }
+  if (texto === "📊 Resumen") {
+    try {
+      await enviarAgenda(ctx);
+    } catch (error) {
+      console.error("Error al obtener la agenda:", error);
+      await ctx.reply("No pude leer la agenda. Revisá la conexión a la base de datos.");
+    }
+    return;
+  }
+  if (texto === "🔎 Consultas") {
+    await ctx.reply("¿Qué querés consultar?", { reply_markup: tecladoConsultas() });
+    return;
+  }
   if (texto === "➕ Nueva carga") {
     await ctx.reply("¿Qué querés cargar?", { reply_markup: tecladoNuevaCarga() });
     return;
@@ -226,6 +259,23 @@ bot.on("callback_query:data", async (ctx) => {
       return;
     }
     await responderFlujo(ctx, await procesarSeleccion(estadoFlujo, accion, valor));
+    return;
+  }
+
+  // Menú "🔎 Consultas": se resuelve directo contra el backend, sin OpenAI.
+  if (esCallbackConsulta(datos)) {
+    await ctx.replyWithChatAction("typing");
+    try {
+      const { texto, teclado } = await responderConsulta(datos);
+      const partes = dividirMensaje(texto);
+      for (let i = 0; i < partes.length; i++) {
+        const esUltima = i === partes.length - 1;
+        await ctx.reply(partes[i]!, esUltima && teclado ? { reply_markup: teclado } : undefined);
+      }
+    } catch (error) {
+      console.error("Error procesando la consulta:", error);
+      await ctx.reply("No pude hacer la consulta. Revisá la conexión a la base de datos.");
+    }
     return;
   }
 

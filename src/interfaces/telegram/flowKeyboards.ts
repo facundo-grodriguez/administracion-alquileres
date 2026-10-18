@@ -25,6 +25,13 @@ export function tecladoNuevaCarga(): InlineKeyboard {
   return teclado;
 }
 
+/** Botón suelto para cargar el alquiler actual (se ofrece junto a la agenda cuando hay ajustes vencidos). */
+export const TEXTO_AYUDA_ALQUILER_ACTUAL = "Si el aumento ya se aplicó, cargá cuánto pagan hoy y la alerta desaparece:";
+
+export function tecladoAlquilerActual(): InlineKeyboard {
+  return new InlineKeyboard().text("⚡ Cargar alquiler actual", "flujo:iniciar:registrar_alquiler_actual");
+}
+
 function botonCancelar(teclado: InlineKeyboard): InlineKeyboard {
   return teclado.row().text("❌ Cancelar", "flujo:cancelar");
 }

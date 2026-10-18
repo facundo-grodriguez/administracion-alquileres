@@ -25,6 +25,11 @@ export async function obtenerResumenAgenda(horizonteDias = 30): Promise<ResumenA
   return { cobrosPendientes, vencimientos };
 }
 
+/** true si hay contratos con la actualización de alquiler ya vencida (para ofrecer el botón de cargarla). */
+export function hayActualizacionesVencidas(resumen: ResumenAgenda): boolean {
+  return resumen.vencimientos.some((v) => v.tipo === "actualizacion_alquiler" && v.diasRestantes <= 0);
+}
+
 function diasTexto(diasRestantes: number): string {
   if (diasRestantes < 0) return `atrasado ${Math.abs(diasRestantes)} día${Math.abs(diasRestantes) === 1 ? "" : "s"}`;
   if (diasRestantes === 0) return "vence hoy";

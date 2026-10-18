@@ -13,12 +13,14 @@ import { crearMovimientoFinancieroTool } from "./crearMovimientoFinanciero.tool.
 import { crearPersonaTool } from "./crearPersona.tool.js";
 import { crearPropiedadTool } from "./crearPropiedad.tool.js";
 import { crearReciboTool } from "./crearRecibo.tool.js";
+import { historialPagosTool } from "./historialPagos.tool.js";
 import { listarGastosTool } from "./listarGastos.tool.js";
 import { listarVencimientosTool } from "./listarVencimientos.tool.js";
 import { marcarGastoPagadoTool } from "./marcarGastoPagado.tool.js";
 import { obtenerAgendaTool } from "./obtenerAgenda.tool.js";
 import { obtenerBalanceFinancieroTool } from "./obtenerBalanceFinanciero.tool.js";
 import { obtenerEstadoPagoTool } from "./obtenerEstadoPago.tool.js";
+import { registrarAlquilerActualTool } from "./registrarAlquilerActual.tool.js";
 import { sugerirBotonesTool } from "./sugerirBotones.tool.js";
 
 export const tools = [
@@ -32,6 +34,7 @@ export const tools = [
   obtenerBalanceFinancieroTool,
   consultarGarantesTool,
   consultarContratoTool,
+  historialPagosTool,
   // Altas
   crearPersonaTool,
   crearPropiedadTool,
@@ -42,6 +45,7 @@ export const tools = [
   // Actualizaciones
   marcarGastoPagadoTool,
   actualizarAlquilerTool,
+  registrarAlquilerActualTool,
   cargarSeguroFinaerTool,
   // UI (Telegram): no toca la base, solo indica qué botones mostrar
   sugerirBotonesTool,

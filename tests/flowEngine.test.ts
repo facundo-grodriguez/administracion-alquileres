@@ -112,6 +112,8 @@ function registroCon(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>
     crear_recibo: flujoDummy("crear_recibo"),
     crear_gasto: flujoDummy("crear_gasto"),
     cargar_seguro_finaer: flujoDummy("cargar_seguro_finaer"),
+    registrar_alquiler_actual: flujoDummy("registrar_alquiler_actual"),
+    cargar_pagos_anteriores: flujoDummy("cargar_pagos_anteriores"),
   };
 }
 

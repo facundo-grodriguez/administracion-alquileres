@@ -9,11 +9,12 @@ export const menuPrincipalKeyboard = new Keyboard()
   .text("➕ Nueva carga")
   .row()
   .text("📊 Resumen")
+  .text("🔎 Consultas")
   .resized();
 
-// Los 5 botones del menú principal (Reply Keyboard) llegan como texto normal. Desde la etapa 9,
-// los 5 se resuelven sin IA (4 con una llamada directa al backend, "➕ Nueva carga" abriendo el
-// selector de flujos guiados) — ver `respuestaMenuDirecto`/`tecladoNuevaCarga` en `index.ts`. Esta
+// Los botones del menú principal (Reply Keyboard) llegan como texto normal. Desde la etapa 9,
+// todos se resuelven sin IA: "➕ Nueva carga" y "🔎 Consultas" abren sus botones y el resto llama
+// directo al backend — ver `respuestaMenuDirecto` en `index.ts`. Esta
 // lista solo se usa para reconocer esas frases como "no es una interrupción real, es el menú" al
 // detectar si el usuario abandonó un flujo guiado a mitad de camino.
 export const ETIQUETAS_MENU_PRINCIPAL = [
@@ -22,6 +23,7 @@ export const ETIQUETAS_MENU_PRINCIPAL = [
   "💰 Pagos",
   "➕ Nueva carga",
   "📊 Resumen",
+  "🔎 Consultas",
 ] as const;
 
 type Boton = { texto: string; datos: string };

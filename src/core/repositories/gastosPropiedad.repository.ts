@@ -41,3 +41,12 @@ export async function marcarPagado(id: string, fechaPago: string, monto?: string
     .returning();
   return filas[0];
 }
+
+/** Todos los gastos que todavía no se marcaron como pagados, sin importar la fecha. */
+export async function listarPendientes() {
+  return db.query.gastosPropiedad.findMany({
+    where: isNull(gastosPropiedad.fechaPago),
+    with: conPropiedad,
+    orderBy: gastosPropiedad.fechaVencimiento,
+  });
+}

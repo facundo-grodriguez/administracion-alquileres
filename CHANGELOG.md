@@ -2,6 +2,20 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.2.0] — 2026-10-18 — Consultas, pagos anteriores y alquiler actual
+- **🔎 Consultas**: botón nuevo en el menú principal que junta todas las consultas con botones, sin
+  pasar por OpenAI — cobros del mes, meses sin pago, historial de pagos por contrato, detalle de un
+  contrato, garantes, vencimientos, actualizaciones de alquiler, gastos sin pagar y balance del mes/año.
+- **📚 Pagos anteriores**: flujo guiado para cargar de una vez varios meses ya cobrados (para contratos
+  que vienen de antes de usar el bot). Sin monto, cada mes toma el valor que correspondía en ese momento;
+  los meses ya pagados no se tocan. Nueva tool `historial_pagos` para consultarlo por chat.
+- **⚡ Alquiler actual**: flujo y tool `registrar_alquiler_actual` para cargar a mano cuánto se paga hoy
+  cuando el aumento ya se aplicó por fuera del bot. Saca la alerta de actualización pendiente hasta el
+  próximo ajuste (sin monto, solo la marca como hecha). La agenda y el aviso diario ofrecen el botón
+  cuando hay actualizaciones vencidas. El próximo cálculo por IPC parte de ese monto real.
+- **Fix**: los cobros (💰 Pagos, agenda) usaban siempre el precio inicial del contrato aunque hubiera
+  actualizaciones registradas; ahora usan el valor vigente de cada período.
+
 ## [9.1.1] — 2026-10-11 — Fix de estabilidad en modo webhook
 Un error dentro de un handler (ej. la base de datos inaccesible) tumbaba el proceso entero en Render:
 en modo webhook grammY no pasa por `bot.catch` y la promesa rechazada quedaba sin capturar, además de
