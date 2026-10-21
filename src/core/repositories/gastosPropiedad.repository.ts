@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { gastosPropiedad } from "../db/schema.js";
 
@@ -31,6 +31,32 @@ export async function listarPorVencer(desde: string, hasta: string) {
     with: conPropiedad,
     orderBy: gastosPropiedad.fechaVencimiento,
   });
+}
+
+export async function obtenerPorId(id: string) {
+  return db.query.gastosPropiedad.findFirst({ where: eq(gastosPropiedad.id, id), with: conPropiedad });
+}
+
+/** Los gastos más recientes (pagados o no), para elegir cuál corregir. */
+export async function listarRecientes(limite = 30) {
+  return db.query.gastosPropiedad.findMany({
+    with: conPropiedad,
+    orderBy: desc(gastosPropiedad.fechaVencimiento),
+    limit: limite,
+  });
+}
+
+/** Corrige datos de un gasto ya cargado. */
+export async function actualizarGasto(
+  id: string,
+  datos: { monto?: string; fechaVencimiento?: string; fechaPago?: string },
+): Promise<GastoPropiedad | undefined> {
+  const filas = await db
+    .update(gastosPropiedad)
+    .set({ ...datos, ...(datos.fechaPago ? { estado: "pagado" as const } : {}), updatedAt: new Date() })
+    .where(eq(gastosPropiedad.id, id))
+    .returning();
+  return filas[0];
 }
 
 export async function marcarPagado(id: string, fechaPago: string, monto?: string): Promise<GastoPropiedad | undefined> {

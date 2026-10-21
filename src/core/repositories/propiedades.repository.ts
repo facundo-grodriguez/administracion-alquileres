@@ -19,6 +19,19 @@ export async function listarPropiedades(): Promise<PropiedadConPropietario[]> {
   return db.query.propiedades.findMany({ with: { propietario: true } }) as Promise<PropiedadConPropietario[]>;
 }
 
+/** Modifica datos de una propiedad (dirección, zona, tipo, propietario). */
+export async function actualizarPropiedad(
+  id: string,
+  datos: Partial<Pick<NuevaPropiedad, "direccion" | "zona" | "tipo" | "propietarioId">>,
+): Promise<Propiedad | undefined> {
+  const filas = await db
+    .update(propiedades)
+    .set({ ...datos, updatedAt: new Date() })
+    .where(eq(propiedades.id, id))
+    .returning();
+  return filas[0];
+}
+
 export async function actualizarCarpetaDrive(id: string, url: string): Promise<Propiedad | undefined> {
   const filas = await db.update(propiedades).set({ carpetaDriveUrl: url }).where(eq(propiedades.id, id)).returning();
   return filas[0];

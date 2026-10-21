@@ -4,6 +4,7 @@ import {
   esCallbackFlujo,
   parseCallbackFlujo,
   renderResultado,
+  tecladoModificar,
   tecladoNuevaCarga,
 } from "../src/interfaces/telegram/flowKeyboards.js";
 
@@ -154,8 +155,19 @@ describe("renderResultado", () => {
   });
 });
 
+describe("tecladoModificar", () => {
+  it("ofrece corregir propiedad, pago, gasto y alquiler actual", () => {
+    expect(botones(tecladoModificar())).toEqual([
+      "flujo:iniciar:editar_propiedad",
+      "flujo:iniciar:crear_recibo",
+      "flujo:iniciar:corregir_gasto",
+      "flujo:iniciar:registrar_alquiler_actual",
+    ]);
+  });
+});
+
 describe("tecladoNuevaCarga", () => {
-  it("ofrece los 8 flujos como accesos directos", () => {
+  it("ofrece los 8 flujos de alta como accesos directos", () => {
     const teclado = tecladoNuevaCarga();
     const datos = botones(teclado);
     expect(datos).toHaveLength(8);
@@ -167,8 +179,8 @@ describe("tecladoNuevaCarga", () => {
         "flujo:iniciar:crear_recibo",
         "flujo:iniciar:crear_gasto",
         "flujo:iniciar:cargar_seguro_finaer",
-        "flujo:iniciar:registrar_alquiler_actual",
         "flujo:iniciar:cargar_pagos_anteriores",
+        "flujo:iniciar:pagar_gasto",
       ]),
     );
   });

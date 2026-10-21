@@ -6,6 +6,8 @@ import { crearGastoFlow } from "./crearGasto.flow.js";
 import { crearPersonaFlow } from "./crearPersona.flow.js";
 import { crearPropiedadFlow } from "./crearPropiedad.flow.js";
 import { crearReciboFlow } from "./crearRecibo.flow.js";
+import { editarPropiedadFlow } from "./editarPropiedad.flow.js";
+import { corregirGastoFlow, pagarGastoFlow } from "./gastosFlujos.js";
 import { registrarAlquilerActualFlow } from "./registrarAlquilerActual.flow.js";
 
 export const FLUJOS: Record<FlowId, DefinicionFlujo> = {
@@ -17,9 +19,12 @@ export const FLUJOS: Record<FlowId, DefinicionFlujo> = {
   cargar_seguro_finaer: cargarSeguroFinaerFlow,
   registrar_alquiler_actual: registrarAlquilerActualFlow,
   cargar_pagos_anteriores: cargarPagosAnterioresFlow,
+  pagar_gasto: pagarGastoFlow,
+  corregir_gasto: corregirGastoFlow,
+  editar_propiedad: editarPropiedadFlow,
 };
 
-/** Los 8 flujos que se ofrecen como accesos directos desde "➕ Nueva carga". */
+/** Los flujos que se ofrecen como accesos directos desde "➕ Nueva carga" (altas). */
 export const FLUJOS_MENU_PRINCIPAL: FlowId[] = [
   "crear_persona",
   "crear_propiedad",
@@ -27,6 +32,14 @@ export const FLUJOS_MENU_PRINCIPAL: FlowId[] = [
   "crear_recibo",
   "cargar_pagos_anteriores",
   "crear_gasto",
+  "pagar_gasto",
   "cargar_seguro_finaer",
-  "registrar_alquiler_actual",
+];
+
+/** Los flujos de "✏️ Modificar": corregir lo que ya está cargado. */
+export const FLUJOS_MODIFICAR: { flowId: FlowId; titulo: string }[] = [
+  { flowId: "editar_propiedad", titulo: "🏠 Propiedad" },
+  { flowId: "crear_recibo", titulo: "💰 Pago de alquiler" },
+  { flowId: "corregir_gasto", titulo: "💡 Gasto" },
+  { flowId: "registrar_alquiler_actual", titulo: "⚡ Alquiler actual" },
 ];

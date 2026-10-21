@@ -2,6 +2,26 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.4.0] — 2026-10-21 — Modificar, pagar gastos y balance por propiedad
+> ✏️ Modificar: propiedad, pago de alquiler y gasto
+> ✅ Pagar gasto (en Nueva carga)
+> 💡 Al cargar un gasto pregunta si ya está pagado
+> 💵 Balance general o por propiedad
+> 👤 Elegir inquilino/garante ya no lista a los dueños
+> ⚡ Alquiler actual pasó a Modificar
+
+- **✏️ Modificar** (botón nuevo del menú principal): editar una propiedad (dirección/nombre, zona, tipo,
+  propietario), corregir un pago de alquiler (el bot avisa "Pago corregido (antes: $X)"), corregir un
+  gasto (monto, vencimiento, fecha de pago; el balance se actualiza) y cargar el alquiler actual.
+- **Gastos en el balance**: un gasto solo entra al balance cuando está pagado, y antes eso solo se podía
+  hacer por chat. Ahora el alta pregunta si ya está pagado, hay un flujo "✅ Pagar gasto" y el balance
+  avisa cuántos gastos cargados siguen sin pagar.
+- **💵 Balance** en Consultas: general o por propiedad, de este mes, el mes anterior o este año.
+- Al cargar un contrato, el listado inicial de inquilinos y garantes no muestra a los dueños de
+  propiedades (buscando por nombre se encuentra a cualquiera).
+- El historial de pagos ofrece "✏️ Corregir un mes".
+- El aviso de versión nueva lista las novedades ítem por ítem (líneas `> ` de cada entrada de este CHANGELOG).
+
 ## [9.3.0] — 2026-10-21 — Aviso automático de versión nueva
 Al arrancar una versión nueva, el bot le manda a los usuarios autorizados un mensaje "✅ Bot actualizado
 a vX.Y.Z" con las novedades (el título de esa versión en este CHANGELOG) y el menú principal actualizado:

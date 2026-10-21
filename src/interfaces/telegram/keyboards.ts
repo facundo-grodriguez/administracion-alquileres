@@ -10,10 +10,12 @@ export const menuPrincipalKeyboard = new Keyboard()
   .row()
   .text("📊 Resumen")
   .text("🔎 Consultas")
+  .row()
+  .text("✏️ Modificar")
   .resized();
 
 // Los botones del menú principal (Reply Keyboard) llegan como texto normal. Desde la etapa 9,
-// todos se resuelven sin IA: "➕ Nueva carga" y "🔎 Consultas" abren sus botones y el resto llama
+// todos se resuelven sin IA: "➕ Nueva carga", "🔎 Consultas" y "✏️ Modificar" abren sus botones y el resto llama
 // directo al backend — ver `respuestaMenuDirecto` en `index.ts`. Esta
 // lista solo se usa para reconocer esas frases como "no es una interrupción real, es el menú" al
 // detectar si el usuario abandonó un flujo guiado a mitad de camino.
@@ -24,6 +26,7 @@ export const ETIQUETAS_MENU_PRINCIPAL = [
   "➕ Nueva carga",
   "📊 Resumen",
   "🔎 Consultas",
+  "✏️ Modificar",
 ] as const;
 
 type Boton = { texto: string; datos: string };

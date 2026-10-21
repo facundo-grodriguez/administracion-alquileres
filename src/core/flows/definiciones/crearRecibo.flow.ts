@@ -16,7 +16,9 @@ export const crearReciboFlow: DefinicionFlujo = {
   pasos: [
     {
       id: "contrato_id",
-      pregunta: () => "¿De qué contrato es el pago? Escribí el nombre del inquilino o la dirección.",
+      pregunta: () =>
+        "¿De qué contrato es el pago? Escribí el nombre del inquilino o la dirección. " +
+        "(Si el mes ya estaba cargado, se corrige con los datos nuevos.)",
       campo: { tipo: "entidad", buscar: buscarContratosVigentesParaFlujo },
     },
     { id: "periodo", pregunta: () => "¿Qué período paga? (MM/AAAA)", campo: { tipo: "periodo" } },

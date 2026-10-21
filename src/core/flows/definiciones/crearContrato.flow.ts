@@ -38,7 +38,7 @@ function pasoGaranteId(n: 1 | 2 | 3): PasoFlujo {
     pregunta: () => "¿Quién es? Elegí uno de la lista o escribí el nombre/DNI para buscar otro.",
     campo: {
       tipo: "entidad",
-      buscar: buscarPersonasParaFlujo(),
+      buscar: buscarPersonasParaFlujo(undefined, { sinPropietariosEnListado: true }),
       crear: "crear_persona",
       datosCrear: { tipo_persona: "garante" },
       etiquetaCrear: "➕ Crear garante",
@@ -68,7 +68,7 @@ export const crearContratoFlow: DefinicionFlujo = {
       pregunta: () => "¿Quién es el inquilino? Elegí uno de la lista o escribí el nombre/DNI para buscar otro.",
       campo: {
         tipo: "entidad",
-        buscar: buscarPersonasParaFlujo(),
+        buscar: buscarPersonasParaFlujo(undefined, { sinPropietariosEnListado: true }),
         crear: "crear_persona",
         datosCrear: { tipo_persona: "inquilino" },
         etiquetaCrear: "➕ Crear inquilino",

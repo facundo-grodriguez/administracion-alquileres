@@ -6,6 +6,7 @@ import { detalleContratoTexto } from "../../core/assistant/tools/consultarContra
 import { historialPagosTexto } from "../../core/assistant/tools/historialPagos.tool.js";
 import * as contratosRepo from "../../core/repositories/contratos.repository.js";
 import * as gastosRepo from "../../core/repositories/gastosPropiedad.repository.js";
+import * as propiedadesRepo from "../../core/repositories/propiedades.repository.js";
 import * as movimientosService from "../../core/services/movimientos.service.js";
 import * as pagosService from "../../core/services/pagos.service.js";
 import * as vencimientosService from "../../core/services/vencimientos.service.js";
@@ -27,8 +28,7 @@ export const OPCIONES_CONSULTA: OpcionConsulta[] = [
   { op: "ipc", texto: "⚡ Actualizaciones de alquiler" },
   { op: "gastos", texto: "💡 Gastos sin pagar" },
   { op: "gar", texto: "🛡️ Garantes", porContrato: true },
-  { op: "balmes", texto: "💵 Balance del mes" },
-  { op: "balanio", texto: "💵 Balance del año" },
+  { op: "bal", texto: "💵 Balance" },
 ];
 
 export type RespuestaConsulta = { texto: string; teclado?: InlineKeyboard };
@@ -37,9 +37,9 @@ export function esCallbackConsulta(datos: string): boolean {
   return datos.startsWith(PREFIJO);
 }
 
-export function parseCallbackConsulta(datos: string): { op: string; contratoId?: string } {
-  const [, op, contratoId] = datos.split(":");
-  return { op: op ?? "", contratoId };
+export function parseCallbackConsulta(datos: string): { op: string; contratoId?: string; extra?: string } {
+  const [, op, contratoId, extra] = datos.split(":");
+  return { op: op ?? "", contratoId, extra };
 }
 
 export function tecladoConsultas(): InlineKeyboard {
@@ -52,8 +52,64 @@ export function tecladoConsultas(): InlineKeyboard {
 }
 
 const botonOtraConsulta = (teclado = new InlineKeyboard()) => teclado.row().text("🔎 Otra consulta", `${PREFIJO}menu`);
-const botonPagosAnteriores = () =>
-  new InlineKeyboard().text("📚 Cargar pagos anteriores", "flujo:iniciar:cargar_pagos_anteriores");
+const botonPagosAnteriores = (teclado = new InlineKeyboard()) =>
+  teclado.text("📚 Cargar pagos anteriores", "flujo:iniciar:cargar_pagos_anteriores");
+const botonCorregirPago = () => new InlineKeyboard().text("✏️ Corregir un mes", "flujo:iniciar:crear_recibo");
+
+// Balance: "cq:bal" elige alcance (general o una propiedad), "cq:bal:<alcance>" elige período y
+// "cq:bal:<alcance>:<periodo>" lo calcula. alcance = "todas" o el id de la propiedad.
+const PERIODOS_BALANCE = [
+  { valor: "mes", texto: "Este mes" },
+  { valor: "mesant", texto: "Mes anterior" },
+  { valor: "anio", texto: "Este año" },
+];
+
+export function rangoBalance(periodo: string, hoy = hoyISO()): { desde: string; hasta: string } {
+  if (periodo === "anio") return { desde: `${hoy.slice(0, 4)}-01-01`, hasta: hoy };
+  if (periodo === "mesant") {
+    const [anio, mes] = hoy.split("-").map(Number) as [number, number];
+    const previo = mes === 1 ? `${anio - 1}-12` : `${anio}-${String(mes - 1).padStart(2, "0")}`;
+    return { desde: `${previo}-01`, hasta: sumarDiasISO(`${hoy.slice(0, 7)}-01`, -1) };
+  }
+  return { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy };
+}
+
+async function balance(alcance?: string, periodo?: string): Promise<RespuestaConsulta> {
+  if (!alcance) {
+    const propiedades = await propiedadesRepo.listarPropiedades();
+    const teclado = new InlineKeyboard().text("🌐 General (todas)", `${PREFIJO}bal:todas`).row();
+    for (const p of propiedades) teclado.text(`🏠 ${p.direccion}`, `${PREFIJO}bal:${p.id}`).row();
+    return { texto: "¿Balance general o de una propiedad?", teclado };
+  }
+  if (!periodo) {
+    const teclado = new InlineKeyboard();
+    for (const p of PERIODOS_BALANCE) teclado.text(p.texto, `${PREFIJO}bal:${alcance}:${p.valor}`);
+    return { texto: "¿De qué período?", teclado };
+  }
+
+  const propiedadId = alcance === "todas" ? undefined : alcance;
+  const propiedad = propiedadId ? await propiedadesRepo.obtenerPropiedadPorId(propiedadId) : undefined;
+  const { desde, hasta } = rangoBalance(periodo);
+  const resultado = await movimientosService.calcularBalance({ propiedadId, desde, hasta });
+
+  // Los gastos cargados pero sin pagar no son movimientos todavía: se avisan aparte para que no
+  // parezca que el balance "perdió" un gasto.
+  const pendientes = (await gastosRepo.listarPendientes()).filter(
+    (g) => (!propiedadId || g.propiedadId === propiedadId) && g.fechaVencimiento <= hasta,
+  );
+  const notaPendientes =
+    pendientes.length > 0
+      ? `\n\n🕓 Además hay ${pendientes.length} gasto(s) cargado(s) sin pagar (${formatoARS(
+          pendientes.reduce((acc, g) => acc + Number(g.monto ?? 0), 0),
+        )}) que no entran en el balance hasta marcarlos como pagados.`
+      : "";
+  const teclado =
+    pendientes.length > 0 ? new InlineKeyboard().text("✅ Pagar gasto", "flujo:iniciar:pagar_gasto") : undefined;
+  return {
+    texto: movimientosService.formatearBalance(resultado, propiedad?.direccion) + notaPendientes,
+    teclado: botonOtraConsulta(teclado),
+  };
+}
 
 async function elegirContrato(op: string): Promise<RespuestaConsulta> {
   const contratos = await contratosRepo.listarContratosVigentes();
@@ -129,7 +185,9 @@ async function porContrato(op: string, contratoId: string): Promise<RespuestaCon
       return { texto: await detalleContratoTexto(contrato), teclado: botonOtraConsulta() };
     case "hist": {
       const { texto, hayDeuda } = await historialPagosTexto(contrato);
-      return { texto, teclado: botonOtraConsulta(hayDeuda ? botonPagosAnteriores() : undefined) };
+      const teclado = botonCorregirPago();
+      if (hayDeuda) botonPagosAnteriores(teclado);
+      return { texto, teclado: botonOtraConsulta(teclado) };
     }
     case "gar": {
       const garantes = contrato.garantes.map(
@@ -149,13 +207,13 @@ async function porContrato(op: string, contratoId: string): Promise<RespuestaCon
 
 /** Resuelve un botón del menú de Consultas. */
 export async function responderConsulta(datos: string): Promise<RespuestaConsulta> {
-  const { op, contratoId } = parseCallbackConsulta(datos);
+  const { op, contratoId, extra } = parseCallbackConsulta(datos);
+  if (op === "bal") return balance(contratoId, extra);
   if (contratoId) return porContrato(op, contratoId);
 
   const opcion = OPCIONES_CONSULTA.find((o) => o.op === op);
   if (opcion?.porContrato) return elegirContrato(op);
 
-  const hoy = hoyISO();
   switch (op) {
     case "cobros":
       return { texto: `💰 Cobros del mes:\n\n${await cobrosDelMesTexto()}`, teclado: botonOtraConsulta() };
@@ -167,12 +225,6 @@ export async function responderConsulta(datos: string): Promise<RespuestaConsult
       return vencimientosTexto("actualizacion_alquiler");
     case "gastos":
       return { texto: await gastosPendientesTexto(), teclado: botonOtraConsulta() };
-    case "balmes":
-    case "balanio": {
-      const desde = op === "balmes" ? `${hoy.slice(0, 7)}-01` : `${hoy.slice(0, 4)}-01-01`;
-      const balance = await movimientosService.calcularBalance({ desde, hasta: hoy });
-      return { texto: movimientosService.formatearBalance(balance), teclado: botonOtraConsulta() };
-    }
     default:
       return { texto: "¿Qué querés consultar?", teclado: tecladoConsultas() };
   }

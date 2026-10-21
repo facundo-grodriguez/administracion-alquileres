@@ -14,6 +14,24 @@ export function tituloVersion(changelog: string, version: string): string | unde
 }
 
 /**
+ * Ítems cortos para Telegram de una versión: las líneas que empiezan con "> " dentro de su entrada
+ * del CHANGELOG (hasta el próximo "## "). Si no tiene, se usa el título.
+ */
+export function novedadesVersion(changelog: string, version: string): string[] {
+  const lineas = changelog.split("\n");
+  const inicio = lineas.findIndex((l) => l.startsWith(`## [${version}]`));
+  if (inicio === -1) return [];
+  const items: string[] = [];
+  for (const linea of lineas.slice(inicio + 1)) {
+    if (linea.startsWith("## ")) break;
+    if (linea.startsWith("> ")) items.push(linea.slice(2).trim());
+  }
+  if (items.length > 0) return items;
+  const titulo = tituloVersion(changelog, version);
+  return titulo ? [titulo] : [];
+}
+
+/**
  * Al arrancar una versión nueva, manda a los usuarios autorizados un aviso con el menú principal
  * actualizado — así el teclado de Telegram se refresca solo, sin tener que mandar /start. Se avisa
  * una sola vez por versión (queda registrado en `recordatorios`): los reinicios de Render (ej. cuando
@@ -26,14 +44,8 @@ export async function avisarVersionNueva(bot: Bot, destinos: number[]): Promise<
   if (await recordatoriosRepo.yaRegistradoAlgunaVez(tipo)) return;
 
   const changelog = await readFile(new URL("CHANGELOG.md", RAIZ), "utf8").catch(() => "");
-  const titulo = tituloVersion(changelog, version);
-  const texto = [
-    `✅ Bot actualizado a v${version}`,
-    titulo ? `Novedades: ${titulo}.` : null,
-    "Ya tenés el menú al día 👇",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const items = novedadesVersion(changelog, version).map((item) => `• ${item}`);
+  const texto = [`✅ Bot actualizado a v${version}`, ...items, "Menú al día 👇"].join("\n");
 
   let algunEnvioExitoso = false;
   for (const chatId of destinos) {

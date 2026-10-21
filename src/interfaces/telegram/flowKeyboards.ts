@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import { FLUJOS, FLUJOS_MENU_PRINCIPAL } from "../../core/flows/definiciones/index.js";
+import { FLUJOS, FLUJOS_MENU_PRINCIPAL, FLUJOS_MODIFICAR } from "../../core/flows/definiciones/index.js";
 import type { CampoFlujo, ResultadoFlujo } from "../../core/flows/types.js";
 import { construirInlineKeyboard } from "./keyboards.js";
 
@@ -30,6 +30,15 @@ export const TEXTO_AYUDA_ALQUILER_ACTUAL = "Si el aumento ya se aplicó, cargá 
 
 export function tecladoAlquilerActual(): InlineKeyboard {
   return new InlineKeyboard().text("⚡ Cargar alquiler actual", "flujo:iniciar:registrar_alquiler_actual");
+}
+
+export function tecladoModificar(): InlineKeyboard {
+  const teclado = new InlineKeyboard();
+  for (let i = 0; i < FLUJOS_MODIFICAR.length; i += 2) {
+    for (const { flowId, titulo } of FLUJOS_MODIFICAR.slice(i, i + 2)) teclado.text(titulo, `flujo:iniciar:${flowId}`);
+    teclado.row();
+  }
+  return teclado;
 }
 
 function botonCancelar(teclado: InlineKeyboard): InlineKeyboard {

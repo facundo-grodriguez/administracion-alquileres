@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { tituloVersion } from "../src/interfaces/telegram/avisoVersion.js";
+import { novedadesVersion, tituloVersion } from "../src/interfaces/telegram/avisoVersion.js";
 
 const CHANGELOG = [
   "# Changelog",
   "",
+  "## [9.4.0] — 2026-10-21 — Varios",
+  "> ✏️ Modificar propiedad",
+  "> 💵 Balance por propiedad",
+  "",
+  "- detalle largo",
   "## [9.3.0] — 2026-10-21 — Aviso automático de versión nueva",
   "Texto.",
   "## [9.2.1] — 2026-10-18 — Botón de alquiler actual en Vencimientos",
@@ -16,5 +21,17 @@ describe("tituloVersion", () => {
   });
   it("devuelve undefined si la versión no está en el changelog", () => {
     expect(tituloVersion(CHANGELOG, "1.0.0")).toBeUndefined();
+  });
+});
+
+describe("novedadesVersion", () => {
+  it("devuelve los ítems cortos de la versión", () => {
+    expect(novedadesVersion(CHANGELOG, "9.4.0")).toEqual(["✏️ Modificar propiedad", "💵 Balance por propiedad"]);
+  });
+  it("si la versión no tiene ítems, usa el título", () => {
+    expect(novedadesVersion(CHANGELOG, "9.3.0")).toEqual(["Aviso automático de versión nueva"]);
+  });
+  it("devuelve vacío si la versión no existe", () => {
+    expect(novedadesVersion(CHANGELOG, "1.0.0")).toEqual([]);
   });
 });

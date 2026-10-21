@@ -47,6 +47,23 @@ export const crearGastoFlow: DefinicionFlujo = {
     },
     { id: "monto", pregunta: () => "¿Monto? (opcional)", campo: { tipo: "monto", opcional: true } },
     {
+      id: "pagado",
+      pregunta: () => "¿Ya está pagado? (si está pagado entra en el balance)",
+      campo: {
+        tipo: "opciones",
+        opciones: [
+          { valor: "si", etiqueta: "✅ Sí" },
+          { valor: "no", etiqueta: "❌ Todavía no" },
+        ],
+      },
+    },
+    {
+      id: "fecha_pago",
+      pregunta: () => "¿Fecha de pago?",
+      campo: { tipo: "fecha", permitirHoy: true },
+      saltar: (datos) => datos.pagado !== "si",
+    },
+    {
       id: "__confirmar",
       pregunta: (datos) =>
         [
@@ -57,6 +74,7 @@ export const crearGastoFlow: DefinicionFlujo = {
           `Vencimiento: ${formatoFechaAR(datos.fecha_vencimiento as string)}`,
           datos.responsable && datos.responsable !== "omitir" ? `Responsable de pago: ${datos.responsable}` : null,
           datos.monto ? `Monto: ${formatoARS(datos.monto as string)}` : null,
+          datos.pagado === "si" ? `Pagado el ${formatoFechaAR(datos.fecha_pago as string)}` : "Pendiente de pago",
         ]
           .filter(Boolean)
           .join("\n"),
@@ -81,5 +99,6 @@ export const crearGastoFlow: DefinicionFlujo = {
       responsable:
         datos.responsable === "omitir" ? undefined : (datos.responsable as "propietario" | "inquilino" | undefined),
       monto: datos.monto as string | undefined,
+      fecha_pago: datos.pagado === "si" ? (datos.fecha_pago as string) : undefined,
     }),
 };

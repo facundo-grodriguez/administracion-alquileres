@@ -26,6 +26,7 @@ import {
   renderResultado,
   TEXTO_AYUDA_ALQUILER_ACTUAL,
   tecladoAlquilerActual,
+  tecladoModificar,
   tecladoNuevaCarga,
 } from "./flowKeyboards.js";
 import {
@@ -83,7 +84,7 @@ const AYUDA = [
   "• ¿Corresponde actualizar el alquiler de Juan?",
   "• Cargá un gasto de expensas para [propiedad] que vence el 30/08",
   "",
-  "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores.",
+  "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores. Para corregir algo ya cargado (propiedad, pago, gasto), usá ✏️ Modificar.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
   "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /reset, /ayuda",
@@ -217,6 +218,10 @@ bot.on("message:text", async (ctx) => {
   }
   if (texto === "🔎 Consultas") {
     await ctx.reply("¿Qué querés consultar?", { reply_markup: tecladoConsultas() });
+    return;
+  }
+  if (texto === "✏️ Modificar") {
+    await ctx.reply("¿Qué querés modificar o corregir?", { reply_markup: tecladoModificar() });
     return;
   }
   if (texto === "➕ Nueva carga") {

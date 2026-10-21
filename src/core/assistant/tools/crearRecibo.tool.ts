@@ -20,7 +20,7 @@ export const crearReciboTool = defineTool({
     observaciones: z.string().optional(),
   }),
   run: async (input) => {
-    const { pago, contrato } = await pagosService.crearRecibo({
+    const { pago, contrato, anterior } = await pagosService.crearRecibo({
       contratoId: input.contrato_id,
       periodo: input.periodo,
       monto: input.monto,
@@ -30,7 +30,7 @@ export const crearReciboTool = defineTool({
     });
     if (!pago) return "No se pudo registrar el pago.";
     return [
-      "Pago registrado.",
+      anterior ? `✏️ Pago corregido (antes: ${formatoARS(anterior.monto)}).` : "Pago registrado.",
       `Inquilino: ${contrato.inquilino.nombreCompleto}`,
       `Propiedad: ${contrato.propiedad.direccion}`,
       `Período: ${formatoPeriodoAR(input.periodo)}`,

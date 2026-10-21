@@ -177,7 +177,7 @@ export async function crearRecibo(input: {
     }
   }
 
-  return { pago, contrato };
+  return { pago, contrato, anterior: existente?.estado === "pagado" ? existente : undefined };
 }
 
 export type CobroDelMes = {

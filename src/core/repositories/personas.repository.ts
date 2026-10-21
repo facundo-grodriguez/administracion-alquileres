@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, notInArray, or } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { contratos, contratosGarantes, personas, propiedades } from "../db/schema.js";
 
@@ -16,11 +16,18 @@ export async function obtenerPersonaPorId(id: string): Promise<Persona | undefin
   return db.query.personas.findFirst({ where: eq(personas.id, id) });
 }
 
-export async function buscarPersonas(query: string, rol?: RolPersona): Promise<Persona[]> {
+export async function buscarPersonas(
+  query: string,
+  rol?: RolPersona,
+  opciones: { excluirPropietarios?: boolean } = {},
+): Promise<Persona[]> {
   const patron = `%${query}%`;
   const condiciones = [
     or(ilike(personas.nombreCompleto, patron), ilike(personas.dni, patron), ilike(personas.telefono, patron)),
   ];
+  if (opciones.excluirPropietarios) {
+    condiciones.push(notInArray(personas.id, db.selectDistinct({ id: propiedades.propietarioId }).from(propiedades)));
+  }
 
   if (rol === "propietario") {
     condiciones.push(inArray(personas.id, db.selectDistinct({ id: propiedades.propietarioId }).from(propiedades)));
