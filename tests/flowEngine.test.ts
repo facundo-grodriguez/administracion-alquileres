@@ -117,6 +117,7 @@ function registroCon(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>
     pagar_gasto: flujoDummy("pagar_gasto"),
     corregir_gasto: flujoDummy("corregir_gasto"),
     editar_propiedad: flujoDummy("editar_propiedad"),
+    cargar_gastos: flujoDummy("cargar_gastos"),
   };
 }
 
@@ -347,5 +348,162 @@ describe("flowEngine — interrupción por texto", () => {
     const r = await procesarTexto(estado, "¿Qué contratos vencen este mes?", [], registro);
     expect(r).toEqual({ tipo: "interrumpido", textoOriginal: "¿Qué contratos vencen este mes?" });
     expect(flujoActivo(estado)).toBe(true); // el motor no cancela solo
+  });
+});
+
+describe("flowEngine — datos iniciales, validación por paso y rechazo", () => {
+  function registroContrato(ejecutar?: DefinicionFlujo["ejecutar"]): RegistroFlujos {
+    const flujo: DefinicionFlujo = {
+      id: "crear_contrato",
+      titulo: "Contrato (test)",
+      etiqueta: () => "contrato",
+      pasos: [
+        {
+          id: "propiedad_id",
+          pregunta: () => "¿Propiedad?",
+          campo: { tipo: "entidad", buscar: async () => [{ id: "p1", etiqueta: "Cerrito 4070" }] },
+        },
+        { id: "fecha_inicio", pregunta: () => "¿Inicio?", campo: { tipo: "fecha" } },
+        {
+          id: "fecha_fin",
+          pregunta: () => "¿Fin?",
+          campo: { tipo: "fecha" },
+          validar: async (d) =>
+            (d.fecha_inicio as string) < "2027-01-01"
+              ? { mensaje: "⚠️ Se pisa con el contrato vigente.", volverA: "fecha_inicio" }
+              : undefined,
+        },
+        { id: "__confirmar", pregunta: () => "Confirmá", campo: { tipo: "confirmacion" } },
+      ],
+      ejecutar: ejecutar ?? (async () => "Contrato registrado.\n(id: c-nuevo)"),
+      botonesPostAccion: "post_contrato",
+    };
+    const registro = {} as RegistroFlujos;
+    for (const id of Object.keys(registroCon(async () => [])) as FlowId[]) registro[id] = flujoDummy(id);
+    registro.crear_contrato = flujo;
+    return registro;
+  }
+
+  it("un paso que ya viene en los datos iniciales no se vuelve a preguntar", async () => {
+    const estado = crearEstadoFlujo();
+    const r = await iniciarFlujo(
+      estado,
+      "crear_contrato",
+      { propiedad_id: "p1", [etiquetaKey("propiedad_id")]: "Cerrito 4070" },
+      registroContrato(),
+    );
+    expect(r).toMatchObject({ tipo: "pregunta", texto: "¿Inicio?" });
+  });
+
+  it("si la validación falla, avisa y vuelve a preguntar desde el paso indicado", async () => {
+    const registro = registroContrato();
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "crear_contrato", { propiedad_id: "p1" }, registro);
+    await procesarTexto(estado, "01/03/2026", [], registro);
+    const r = await procesarTexto(estado, "28/02/2028", [], registro);
+    expect(r.tipo).toBe("pregunta");
+    expect("texto" in r && r.texto).toBe("⚠️ Se pisa con el contrato vigente.\n\n¿Inicio?");
+
+    await procesarTexto(estado, "01/03/2027", [], registro);
+    const ok = await procesarTexto(estado, "28/02/2029", [], registro);
+    expect(ok).toMatchObject({ tipo: "pregunta", texto: "Confirmá" });
+  });
+
+  it("al completar devuelve la referencia (propiedad elegida y contrato creado)", async () => {
+    const registro = registroContrato();
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "crear_contrato", { propiedad_id: "p1" }, registro);
+    await procesarTexto(estado, "01/03/2027", [], registro);
+    await procesarTexto(estado, "28/02/2029", [], registro);
+    const r = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
+    expect(r).toMatchObject({
+      tipo: "completado",
+      botonesPostAccion: "post_contrato",
+      referencia: { propiedadId: "p1", contratoId: "c-nuevo" },
+    });
+  });
+
+  it("si ejecutar rechaza la carga, termina sin botones posteriores", async () => {
+    const registro = registroContrato(async () => ({ texto: "⚠️ No cargué el contrato.", rechazado: true }));
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "crear_contrato", { propiedad_id: "p1" }, registro);
+    await procesarTexto(estado, "01/03/2027", [], registro);
+    await procesarTexto(estado, "28/02/2029", [], registro);
+    const r = await procesarSeleccion(estado, CALLBACK_CONFIRMAR, undefined, registro);
+    expect(r).toEqual({ tipo: "completado", texto: "⚠️ No cargué el contrato." });
+    expect(flujoActivo(estado)).toBe(false);
+  });
+});
+
+describe("flujo real de varios gastos (cargar_gastos)", () => {
+  it("con todo pago no pide vencimientos y corta con 'No hay más'", async () => {
+    const { cargarGastosFlow } = await import("../src/core/flows/definiciones/cargarGastos.flow.js");
+    const registro = registroCon(async () => []);
+    const flujo = {
+      ...cargarGastosFlow,
+      pasos: cargarGastosFlow.pasos.map((p) =>
+        p.id === "propiedad_id"
+          ? { ...p, campo: { tipo: "entidad" as const, buscar: async () => [{ id: "p1", etiqueta: "Cerrito 4070" }] } }
+          : p,
+      ),
+      ejecutar: async () => "ok",
+    };
+    registro.cargar_gastos = flujo;
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "cargar_gastos", {}, registro);
+    await procesarSeleccion(estado, "sel", "0", registro);
+    await procesarSeleccion(estado, "opt", "si", registro); // pagados
+    await procesarSeleccion(estado, CALLBACK_HOY, undefined, registro); // fecha de pago
+    await procesarSeleccion(estado, "opt", "omitir", registro); // responsable
+    await procesarSeleccion(estado, "opt", "luz", registro);
+    const r1 = await procesarTexto(estado, "25000", [], registro);
+    expect(r1).toMatchObject({ tipo: "pregunta", texto: "¿Otro gasto? (van 1)" });
+    await procesarSeleccion(estado, "opt", "gas", registro);
+    await procesarTexto(estado, "18000", [], registro);
+    const fin = await procesarSeleccion(estado, "opt", "fin", registro);
+    expect(fin.tipo).toBe("pregunta");
+    expect("texto" in fin && fin.texto).toContain("Confirmá 2 gasto(s) de Cerrito 4070");
+    expect("texto" in fin && fin.texto).toContain("Total gastos: ");
+  });
+});
+
+describe("flujo real de pago con servicios (crear_recibo)", () => {
+  it("después del medio de pago ofrece cargar los servicios, sin pedir vencimiento", async () => {
+    const { crearReciboFlow } = await import("../src/core/flows/definiciones/crearRecibo.flow.js");
+    const registro = registroCon(async () => []);
+    registro.crear_recibo = { ...crearReciboFlow, ejecutar: async () => "ok" };
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(
+      estado,
+      "crear_recibo",
+      { contrato_id: "c1", [etiquetaKey("contrato_id")]: "Sebastián — Cerrito 4070" },
+      registro,
+    );
+    await procesarTexto(estado, "10/2026", [], registro);
+    await procesarTexto(estado, "450000", [], registro);
+    await procesarSeleccion(estado, CALLBACK_HOY, undefined, registro);
+    const r = await procesarSeleccion(estado, "opt", "transferencia", registro);
+    expect(r).toMatchObject({ tipo: "pregunta" });
+    expect("texto" in r && r.texto).toContain("¿Pagó también servicios");
+    await procesarSeleccion(estado, "opt", "si", registro);
+    await procesarSeleccion(estado, "opt", "luz", registro);
+    const otro = await procesarTexto(estado, "25000", [], registro);
+    expect(otro).toMatchObject({ texto: "¿Otro gasto? (van 1)" });
+    const fin = await procesarSeleccion(estado, "opt", "fin", registro);
+    expect("texto" in fin && fin.texto).toContain("Servicios pagados:");
+  });
+
+  it("si no pagó servicios, va directo a confirmar", async () => {
+    const { crearReciboFlow } = await import("../src/core/flows/definiciones/crearRecibo.flow.js");
+    const registro = registroCon(async () => []);
+    registro.crear_recibo = { ...crearReciboFlow, ejecutar: async () => "ok" };
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "crear_recibo", { contrato_id: "c1" }, registro);
+    await procesarTexto(estado, "10/2026", [], registro);
+    await procesarTexto(estado, "450000", [], registro);
+    await procesarSeleccion(estado, CALLBACK_HOY, undefined, registro);
+    await procesarSeleccion(estado, "opt", "transferencia", registro);
+    const r = await procesarSeleccion(estado, "opt", "no", registro);
+    expect("texto" in r && r.texto).toContain("Confirmá el pago");
   });
 });

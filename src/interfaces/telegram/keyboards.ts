@@ -1,5 +1,6 @@
 import { InlineKeyboard, Keyboard } from "grammy";
 import type { ContextoTeclado } from "../../core/assistant/tools/sugerirBotones.tool.js";
+import type { ReferenciaEntidad } from "../../core/flows/types.js";
 
 export const menuPrincipalKeyboard = new Keyboard()
   .text("🏠 Propiedades")
@@ -74,7 +75,7 @@ const BOTONES: Record<ContextoTeclado, Boton[]> = {
     { texto: "⚡ Actualizar IPC", datos: "accion:consultar_ipc" },
     { texto: "💰 Registrar pago", datos: "accion:registrar_pago" },
     { texto: "🛡️ Seguro Finaer", datos: "accion:cargar_finaer" },
-    { texto: "📆 Próximos vencimientos", datos: "accion:vencimientos" },
+    { texto: "📆 Próximos vencimientos", datos: "cq:venc" },
     { texto: "🏠 Volver a la propiedad", datos: "accion:ver_propiedad" },
   ],
   post_propiedad: [
@@ -103,7 +104,11 @@ const BOTONES: Record<ContextoTeclado, Boton[]> = {
   ],
 };
 
-/** Callback_data → frase en lenguaje natural que se le manda a ChatSession, como si el usuario la hubiera tipeado. */
+/**
+ * Callback_data → frase en lenguaje natural que se le manda a ChatSession, como si el usuario la
+ * hubiera tipeado. Son solo respuestas a preguntas que hizo el asistente en el chat libre (tipo de
+ * persona, índice, frecuencia...). Los botones "accion:*" se resuelven sin IA en `acciones.ts`.
+ */
 const TEXTO_POR_DATO: Record<string, string> = {
   "persona:propietario": "Es el propietario",
   "persona:inquilino": "Es el inquilino",
@@ -123,27 +128,35 @@ const TEXTO_POR_DATO: Record<string, string> = {
   "estado:pagado": "Mostrame los pagos pagados",
   "estado:parcial": "Mostrame los pagos parciales",
   "estado:atrasado": "Mostrame los pagos atrasados",
-  "accion:crear_contrato": "Quiero crear un contrato para esa propiedad",
-  "accion:agregar_gasto": "Quiero agregar un gasto a esa propiedad",
-  "accion:ver_propiedad": "Mostrame el detalle de esa propiedad",
-  "accion:registrar_pago": "Quiero registrar un pago de ese contrato",
-  "accion:consultar_ipc": "¿Corresponde actualizar el alquiler de ese contrato?",
-  "accion:cargar_finaer": "Quiero cargar el Seguro Finaer de ese contrato",
-  "accion:ver_contrato": "Mostrame el detalle de ese contrato",
-  "accion:otro_pago": "Quiero registrar otro pago",
-  "accion:otro_gasto": "Quiero agregar otro gasto a esa propiedad",
-  "accion:vencimientos": "¿Qué vencimientos tiene ese contrato?",
 };
+
+// Acciones que se refieren a un contrato o a una propiedad: si se sabe cuál, viaja en el botón.
+const ACCIONES_CONTRATO = new Set(["registrar_pago", "otro_pago", "cargar_finaer", "ver_contrato", "consultar_ipc"]);
+const ACCIONES_PROPIEDAD = new Set(["crear_contrato", "agregar_gasto", "otro_gasto", "ver_propiedad"]);
+
+/** Agrega al callback de una acción el id del contrato o la propiedad (≤ 64 bytes en total). */
+export function datosConReferencia(datos: string, referencia?: ReferenciaEntidad): string {
+  if (!referencia || !datos.startsWith("accion:")) return datos;
+  const accion = datos.slice("accion:".length);
+  const { contratoId, propiedadId } = referencia;
+  if (ACCIONES_CONTRATO.has(accion) && contratoId) return `${datos}:c:${contratoId}`;
+  if (ACCIONES_PROPIEDAD.has(accion)) {
+    if (propiedadId) return `${datos}:p:${propiedadId}`;
+    if (contratoId) return `${datos}:c:${contratoId}`;
+  }
+  if (ACCIONES_CONTRATO.has(accion) && propiedadId) return `${datos}:p:${propiedadId}`;
+  return datos;
+}
 
 /** Casos de navegación pura: se resuelven sin llamar al modelo (más rápido, no gasta la API). */
 export const NAV_MENU = "nav:menu";
 export const NAV_CANCELAR = "nav:cancelar";
 
-export function construirInlineKeyboard(contexto: ContextoTeclado): InlineKeyboard {
+export function construirInlineKeyboard(contexto: ContextoTeclado, referencia?: ReferenciaEntidad): InlineKeyboard {
   const teclado = new InlineKeyboard();
   const botones = BOTONES[contexto];
   for (let i = 0; i < botones.length; i += 2) {
-    for (const boton of botones.slice(i, i + 2)) teclado.text(boton.texto, boton.datos);
+    for (const boton of botones.slice(i, i + 2)) teclado.text(boton.texto, datosConReferencia(boton.datos, referencia));
     teclado.row();
   }
   return teclado;

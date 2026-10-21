@@ -26,9 +26,12 @@ describe("esCallbackFlujo / parseCallbackFlujo", () => {
   });
 
   it("separa acción y valor", () => {
-    expect(parseCallbackFlujo("flujo:opt:mensual")).toEqual({ accion: "opt", valor: "mensual" });
-    expect(parseCallbackFlujo("flujo:iniciar:crear_persona")).toEqual({ accion: "iniciar", valor: "crear_persona" });
-    expect(parseCallbackFlujo("flujo:cancelar")).toEqual({ accion: "cancelar", valor: undefined });
+    expect(parseCallbackFlujo("flujo:opt:mensual")).toMatchObject({ accion: "opt", valor: "mensual" });
+    expect(parseCallbackFlujo("flujo:iniciar:crear_persona")).toMatchObject({
+      accion: "iniciar",
+      valor: "crear_persona",
+    });
+    expect(parseCallbackFlujo("flujo:cancelar")).toMatchObject({ accion: "cancelar", valor: undefined });
   });
 });
 
@@ -167,10 +170,10 @@ describe("tecladoModificar", () => {
 });
 
 describe("tecladoNuevaCarga", () => {
-  it("ofrece los 8 flujos de alta como accesos directos", () => {
+  it("ofrece los 9 flujos de alta como accesos directos", () => {
     const teclado = tecladoNuevaCarga();
     const datos = botones(teclado);
-    expect(datos).toHaveLength(8);
+    expect(datos).toHaveLength(9);
     expect(datos).toEqual(
       expect.arrayContaining([
         "flujo:iniciar:crear_persona",
@@ -181,7 +184,29 @@ describe("tecladoNuevaCarga", () => {
         "flujo:iniciar:cargar_seguro_finaer",
         "flujo:iniciar:cargar_pagos_anteriores",
         "flujo:iniciar:pagar_gasto",
+        "flujo:iniciar:cargar_gastos",
       ]),
     );
+  });
+});
+
+describe("botones de flujo con número de carga", () => {
+  it("marca los botones del flujo y el parse lo lee", () => {
+    const { teclado } = renderResultado(
+      { tipo: "candidatos", texto: "¿Cuál?", candidatos: [{ id: "a", etiqueta: "A" }] },
+      7,
+    );
+    const datos = botones(teclado);
+    expect(datos).toEqual(["flujo:sel:0~7", "flujo:cancelar~7"]);
+    expect(parseCallbackFlujo("flujo:sel:0~7")).toEqual({ accion: "sel", valor: "0", carga: 7 });
+    expect(parseCallbackFlujo("flujo:iniciar:crear_gasto")).toEqual({
+      accion: "iniciar",
+      valor: "crear_gasto",
+      carga: undefined,
+    });
+  });
+
+  it("los botones para iniciar una carga no se marcan", () => {
+    expect(botones(tecladoNuevaCarga()).every((d) => !d.includes("~"))).toBe(true);
   });
 });

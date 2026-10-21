@@ -9,9 +9,29 @@ export function esCallbackFlujo(datos: string): boolean {
   return datos.startsWith(PREFIJO);
 }
 
-export function parseCallbackFlujo(datos: string): { accion: string; valor?: string } {
-  const [, accion, ...resto] = datos.split(":");
-  return { accion: accion ?? "", valor: resto.length > 0 ? resto.join(":") : undefined };
+/** "flujo:<accion>[:<valor>][~<carga>]" — la carga identifica a qué flujo pertenece el botón. */
+export function parseCallbackFlujo(datos: string): { accion: string; valor?: string; carga?: number } {
+  const [cuerpo = "", cargaTexto] = datos.split("~");
+  const [, accion, ...resto] = cuerpo.split(":");
+  const carga = cargaTexto !== undefined && /^\d+$/.test(cargaTexto) ? Number(cargaTexto) : undefined;
+  return { accion: accion ?? "", valor: resto.length > 0 ? resto.join(":") : undefined, carga };
+}
+
+/** Marca los botones de un flujo con su número de carga (menos "iniciar", que siempre vale). */
+function marcarCarga(teclado: InlineKeyboard | undefined, carga: number | undefined): InlineKeyboard | undefined {
+  if (!teclado || carga === undefined) return teclado;
+  for (const fila of teclado.inline_keyboard) {
+    for (const boton of fila) {
+      if (
+        "callback_data" in boton &&
+        boton.callback_data?.startsWith(PREFIJO) &&
+        !boton.callback_data.startsWith(`${PREFIJO}iniciar:`)
+      ) {
+        boton.callback_data = `${boton.callback_data}~${carga}`;
+      }
+    }
+  }
+  return teclado;
 }
 
 export function tecladoNuevaCarga(): InlineKeyboard {
@@ -76,7 +96,15 @@ function tecladoParaCampo(campo: CampoFlujo): InlineKeyboard {
 }
 
 /** Convierte el resultado del motor de flujos en un mensaje listo para mandar por Telegram. */
-export function renderResultado(resultado: ResultadoFlujo): { texto: string; teclado?: InlineKeyboard } {
+export function renderResultado(
+  resultado: ResultadoFlujo,
+  carga?: number,
+): { texto: string; teclado?: InlineKeyboard } {
+  const r = renderSinCarga(resultado);
+  return { texto: r.texto, teclado: marcarCarga(r.teclado, carga) };
+}
+
+function renderSinCarga(resultado: ResultadoFlujo): { texto: string; teclado?: InlineKeyboard } {
   switch (resultado.tipo) {
     case "pregunta":
     case "reprompt":
@@ -104,7 +132,9 @@ export function renderResultado(resultado: ResultadoFlujo): { texto: string; tec
     case "completado":
       return {
         texto: resultado.texto,
-        teclado: resultado.botonesPostAccion ? construirInlineKeyboard(resultado.botonesPostAccion) : undefined,
+        teclado: resultado.botonesPostAccion
+          ? construirInlineKeyboard(resultado.botonesPostAccion, resultado.referencia)
+          : undefined,
       };
     case "cancelado":
     case "interrumpido":

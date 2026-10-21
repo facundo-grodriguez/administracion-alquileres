@@ -15,6 +15,12 @@ export async function obtenerPropiedadPorId(id: string): Promise<Propiedad | und
   return db.query.propiedades.findFirst({ where: eq(propiedades.id, id) });
 }
 
+export async function obtenerConPropietario(id: string): Promise<PropiedadConPropietario | undefined> {
+  return db.query.propiedades.findFirst({ where: eq(propiedades.id, id), with: { propietario: true } }) as Promise<
+    PropiedadConPropietario | undefined
+  >;
+}
+
 export async function listarPropiedades(): Promise<PropiedadConPropietario[]> {
   return db.query.propiedades.findMany({ with: { propietario: true } }) as Promise<PropiedadConPropietario[]>;
 }

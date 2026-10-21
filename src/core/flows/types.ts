@@ -16,9 +16,16 @@ export type FlowId =
   | "cargar_pagos_anteriores"
   | "pagar_gasto"
   | "corregir_gasto"
-  | "editar_propiedad";
+  | "editar_propiedad"
+  | "cargar_gastos";
 
 export type DatosFlujo = Record<string, unknown>;
+
+/** A qué propiedad/contrato se refiere el resultado (para que los botones posteriores no pregunten de nuevo). */
+export type ReferenciaEntidad = { propiedadId?: string; contratoId?: string };
+
+/** Lo que devuelve `ejecutar`: el texto, o el texto marcando que no se pudo hacer (sin botones posteriores). */
+export type ResultadoEjecucion = string | { texto: string; rechazado: true };
 
 export type OpcionCampo = { valor: string; etiqueta: string };
 export type CandidatoFlujo = { id: string; etiqueta: string };
@@ -48,6 +55,11 @@ export type PasoFlujo = {
   campo: CampoFlujo;
   /** Paso condicional (ej. datos de Finaer solo si el paso anterior fue "sí"). */
   saltar?: (datos: DatosFlujo) => boolean;
+  /**
+   * Validación de negocio al responder este paso (ej. fechas que se pisan con otro contrato). Si
+   * devuelve un aviso, se muestra y se vuelve a preguntar desde `volverA` (o este mismo paso).
+   */
+  validar?: (datos: DatosFlujo) => Promise<{ mensaje: string; volverA?: string } | undefined>;
 };
 
 export type DefinicionFlujo = {
@@ -59,7 +71,7 @@ export type DefinicionFlujo = {
   /** El último paso siempre debe ser `{ campo: { tipo: "confirmacion" } }`. */
   pasos: PasoFlujo[];
   /** Llama al `run()` de la tool correspondiente — nunca reimplementa la persistencia. */
-  ejecutar: (datos: DatosFlujo) => Promise<string>;
+  ejecutar: (datos: DatosFlujo) => Promise<ResultadoEjecucion>;
   botonesPostAccion?: ContextoTeclado;
 };
 
@@ -75,10 +87,12 @@ export type FlowFrame = {
 
 export type FlowState = {
   pila: FlowFrame[];
+  /** Número de carga: aumenta con cada flujo nuevo. Los botones lo llevan para descartar los de cargas anteriores. */
+  carga?: number;
 };
 
 export function crearEstadoFlujo(): FlowState {
-  return { pila: [] };
+  return { pila: [], carga: 0 };
 }
 
 export type ResultadoFlujo =
@@ -94,7 +108,7 @@ export type ResultadoFlujo =
     }
   | { tipo: "reprompt"; texto: string; campo: CampoFlujo }
   | { tipo: "interrumpido"; textoOriginal: string }
-  | { tipo: "completado"; texto: string; botonesPostAccion?: ContextoTeclado }
+  | { tipo: "completado"; texto: string; botonesPostAccion?: ContextoTeclado; referencia?: ReferenciaEntidad }
   | { tipo: "cancelado"; texto: string }
   | { tipo: "confirmar_cancelacion"; texto: string }
   | { tipo: "sin_flujo" };

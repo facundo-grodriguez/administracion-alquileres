@@ -2,6 +2,40 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.5.0] — 2026-10-21 — Varios gastos de una vez, botones sin IA y contratos superpuestos
+> 💰 Al cargar el pago del alquiler, podés sumar los servicios que pagó
+> 🧾 Varios gastos: cargá todos los servicios juntos, ya pagos
+> 🔧 Tocar el menú en medio de una carga ya no deja botones colgados
+> 👉 Al tocar un botón, queda escrito lo que elegiste
+> 🚫 No deja cargar un contrato sobre una propiedad alquilada en esas fechas
+> 🔴 Al elegir propiedad para un contrato, marca las alquiladas
+> ⚡ Todos los botones funcionan sin IA (menos IPC)
+> 🎯 Pago, gasto, Finaer y contrato desde un botón ya traen la propiedad/contrato
+
+- **💰 Pago + servicios**: después del medio de pago, "💰 Pago" pregunta si también pagó servicios o
+  gastos de la propiedad; si sí, se cargan uno tras otro (tipo y monto) como gastos pagados con la misma
+  fecha que el alquiler, cada uno independiente.
+- **Fix botones colgados**: si se tocaba el menú a mitad de una carga, la carga se cancelaba sin avisar y
+  sus botones viejos no respondían nada (o, con otra carga en curso, podían aplicarse a la carga nueva).
+  Ahora avisa "Dejé sin terminar la carga de …", cada carga marca sus botones y un botón de una carga
+  anterior responde que ya terminó. Empezar una carga nueva con otra a medias cancela la anterior avisando.
+- **🧾 Varios gastos** (en Nueva carga): propiedad → "¿ya están pagados?" → fecha de pago → un gasto
+  tras otro (tipo y monto) hasta "No hay más". Cada uno queda como un gasto independiente y, si están
+  pagos, entran directo al balance sin pasar por "Pagar gasto". Si no están pagos, pide el vencimiento
+  de cada uno.
+- **Opción elegida visible**: al tocar un botón, el mensaje queda con "👉 <opción>" en vez de solo perder
+  los botones, así se ve en el chat qué se eligió en cada paso.
+- **Contratos superpuestos**: el alta (flujo y chat) rechaza un contrato cuyas fechas se pisan con otro
+  vigente de la misma propiedad, y dice desde cuándo puede empezar una renovación. En el flujo guiado se
+  chequea apenas se carga la fecha de fin (vuelve a pedir las fechas), y el listado de propiedades marca
+  con 🔴 las que ya están alquiladas.
+- **Botones sin OpenAI**: "Registrar pago", "Ver contrato", "Ver propiedad", "Agregar gasto", "Crear
+  contrato", "Seguro Finaer" y "Próximos vencimientos" se resuelven con código propio (abren el flujo
+  guiado o muestran el dato). Si el botón viene de una carga o detalle, trae la propiedad/contrato y el
+  flujo no lo vuelve a preguntar. Solo "⚡ IPC" y el chat libre siguen pasando por la IA.
+- Motor de flujos: pasos ya completados de antemano se saltean, validación de negocio por paso
+  (`validar`) y `ejecutar` puede rechazar la carga (termina sin botones posteriores).
+
 ## [9.4.0] — 2026-10-21 — Modificar, pagar gastos y balance por propiedad
 > ✏️ Modificar: propiedad, pago de alquiler y gasto
 > ✅ Pagar gasto (en Nueva carga)

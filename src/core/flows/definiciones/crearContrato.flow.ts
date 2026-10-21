@@ -1,8 +1,20 @@
-import { crearContratoTool } from "../../assistant/tools/crearContrato.tool.js";
+import { crearContratoTool, validarSuperposicion } from "../../assistant/tools/crearContrato.tool.js";
+import * as contratosRepo from "../../repositories/contratos.repository.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { buscarPersonasParaFlujo, buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
-import { type DefinicionFlujo, etiquetaKey, type PasoFlujo } from "../types.js";
+import { type CandidatoFlujo, type DefinicionFlujo, etiquetaKey, type PasoFlujo } from "../types.js";
+
+/** Propiedades para el alta de contrato, marcando las que ya tienen un contrato vigente. */
+async function buscarPropiedadesConEstado(query: string): Promise<CandidatoFlujo[]> {
+  const candidatos = await buscarPropiedadesParaFlujo(query);
+  return Promise.all(
+    candidatos.map(async (c) => {
+      const vigente = await contratosRepo.buscarContratoVigentePorPropiedad(c.id);
+      return vigente ? { ...c, etiqueta: `🔴 ${c.etiqueta} — alquilada hasta ${formatoFechaAR(vigente.fechaFin)}` } : c;
+    }),
+  );
+}
 
 const SI_NO = [
   { valor: "si", etiqueta: "✅ Sí" },
@@ -58,7 +70,7 @@ export const crearContratoFlow: DefinicionFlujo = {
         "¿De qué propiedad es el contrato? Elegí una de la lista o escribí la dirección para buscar otra.",
       campo: {
         tipo: "entidad",
-        buscar: buscarPropiedadesParaFlujo,
+        buscar: buscarPropiedadesConEstado,
         crear: "crear_propiedad",
         etiquetaCrear: "➕ Crear propiedad",
       },
@@ -81,7 +93,20 @@ export const crearContratoFlow: DefinicionFlujo = {
     pasoGaranteSiNo(3),
     pasoGaranteId(3),
     { id: "fecha_inicio", pregunta: () => "¿Fecha de inicio del contrato? (DD/MM/AAAA)", campo: { tipo: "fecha" } },
-    { id: "fecha_fin", pregunta: () => "¿Fecha de finalización? (DD/MM/AAAA)", campo: { tipo: "fecha" } },
+    {
+      id: "fecha_fin",
+      pregunta: () => "¿Fecha de finalización? (DD/MM/AAAA)",
+      campo: { tipo: "fecha" },
+      // Se chequea acá (y no al final) para no hacer completar todo el alta en vano.
+      validar: async (datos) => {
+        const aviso = await validarSuperposicion(
+          datos.propiedad_id as string,
+          datos.fecha_inicio as string,
+          datos.fecha_fin as string,
+        );
+        return aviso ? { mensaje: aviso, volverA: "fecha_inicio" } : undefined;
+      },
+    },
     { id: "valor_alquiler", pregunta: () => "¿Valor inicial del alquiler?", campo: { tipo: "monto" } },
     {
       id: "frecuencia_actualizacion",
@@ -142,8 +167,14 @@ export const crearContratoFlow: DefinicionFlujo = {
       campo: { tipo: "confirmacion" },
     },
   ],
-  ejecutar: (datos) =>
-    crearContratoTool.run({
+  ejecutar: async (datos) => {
+    const aviso = await validarSuperposicion(
+      datos.propiedad_id as string,
+      datos.fecha_inicio as string,
+      datos.fecha_fin as string,
+    );
+    if (aviso) return { texto: aviso, rechazado: true };
+    return crearContratoTool.run({
       propiedad_id: datos.propiedad_id as string,
       inquilino_id: datos.inquilino_id as string,
       garante_ids: garanteIds(datos),
@@ -157,7 +188,8 @@ export const crearContratoFlow: DefinicionFlujo = {
       finaer_numero_poliza: datos.finaer_numero_poliza as string | undefined,
       finaer_fecha_inicio: datos.finaer_fecha_inicio as string | undefined,
       finaer_fecha_vencimiento: datos.finaer_fecha_vencimiento as string | undefined,
-    }),
+    });
+  },
 };
 
 function garanteIds(datos: Record<string, unknown>): string[] {

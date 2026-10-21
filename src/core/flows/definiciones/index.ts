@@ -1,4 +1,5 @@
 import type { DefinicionFlujo, FlowId } from "../types.js";
+import { cargarGastosFlow } from "./cargarGastos.flow.js";
 import { cargarPagosAnterioresFlow } from "./cargarPagosAnteriores.flow.js";
 import { cargarSeguroFinaerFlow } from "./cargarSeguroFinaer.flow.js";
 import { crearContratoFlow } from "./crearContrato.flow.js";
@@ -22,6 +23,7 @@ export const FLUJOS: Record<FlowId, DefinicionFlujo> = {
   pagar_gasto: pagarGastoFlow,
   corregir_gasto: corregirGastoFlow,
   editar_propiedad: editarPropiedadFlow,
+  cargar_gastos: cargarGastosFlow,
 };
 
 /** Los flujos que se ofrecen como accesos directos desde "➕ Nueva carga" (altas). */
@@ -32,6 +34,7 @@ export const FLUJOS_MENU_PRINCIPAL: FlowId[] = [
   "crear_recibo",
   "cargar_pagos_anteriores",
   "crear_gasto",
+  "cargar_gastos",
   "pagar_gasto",
   "cargar_seguro_finaer",
 ];

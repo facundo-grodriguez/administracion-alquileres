@@ -4,8 +4,8 @@ import type { Context } from "grammy";
 import { Bot, webhookCallback } from "grammy";
 import { env } from "../../config/env.js";
 import { ChatSession, type RespuestaAsistente } from "../../core/assistant/chatSession.js";
+import { FLUJOS } from "../../core/flows/definiciones/index.js";
 import {
-  CALLBACK_CANCELAR,
   cancelarFlujo,
   flujoActivo,
   iniciarFlujo,
@@ -18,6 +18,7 @@ import {
   hayActualizacionesVencidas,
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
+import { esCallbackAccion, resolverAccion } from "./acciones.js";
 import { avisarVersionNueva } from "./avisoVersion.js";
 import { esCallbackConsulta, responderConsulta, tecladoConsultas } from "./consultas.js";
 import {
@@ -39,7 +40,7 @@ import {
 } from "./keyboards.js";
 import { cobrosDelMesTexto, listarContratosVigentesTexto, listarPropiedadesTexto } from "./menuDirecto.js";
 import { enviarDigestDiario, iniciarSchedulerAgenda } from "./scheduler.js";
-import { dividirMensaje } from "./util.js";
+import { dividirMensaje, textoConEleccion } from "./util.js";
 
 // En algunos entornos (Windows con IPv6 mal configurado, ciertos sandboxes) la resolución DNS
 // prioriza IPv6 y api.telegram.org queda inalcanzable por esa vía. Forzar IPv4 primero evita
@@ -105,10 +106,31 @@ bot.use(async (ctx, next) => {
   );
 });
 
+/**
+ * Saca los botones del mensaje ya respondido y deja escrita la opción elegida ("👉 Cerrito 4070"),
+ * para que se siga viendo en el chat qué se eligió en cada paso.
+ */
+async function dejarEleccionEscrita(ctx: Context, datos: string): Promise<void> {
+  const mensaje = ctx.callbackQuery?.message;
+  const elegido = mensaje?.reply_markup?.inline_keyboard
+    .flat()
+    .find((b) => "callback_data" in b && b.callback_data === datos)?.text;
+  const texto = mensaje && "text" in mensaje ? mensaje.text : undefined;
+  try {
+    if (texto && elegido) {
+      await ctx.editMessageText(textoConEleccion(texto, elegido)); // sin reply_markup: saca los botones
+    } else {
+      await ctx.editMessageReplyMarkup();
+    }
+  } catch {
+    // el mensaje puede ser muy viejo para editarlo; no es grave, seguimos igual.
+  }
+}
+
 /** Manda la respuesta del asistente, adjuntando el teclado contextual (si hay) solo al último tramo. */
 async function responder(ctx: Context, respuesta: RespuestaAsistente): Promise<void> {
   const partes = dividirMensaje(respuesta.texto);
-  const teclado = respuesta.teclado ? construirInlineKeyboard(respuesta.teclado) : undefined;
+  const teclado = respuesta.teclado ? construirInlineKeyboard(respuesta.teclado, respuesta.referencia) : undefined;
   for (let i = 0; i < partes.length; i++) {
     const esUltima = i === partes.length - 1;
     await ctx.reply(partes[i]!, esUltima && teclado ? { reply_markup: teclado } : undefined);
@@ -117,7 +139,8 @@ async function responder(ctx: Context, respuesta: RespuestaAsistente): Promise<v
 
 /** Manda el resultado de un paso de flujo guiado (etapa 9), sin pasar por OpenAI en ningún caso. */
 async function responderFlujo(ctx: Context, resultado: ResultadoFlujo): Promise<void> {
-  const { texto, teclado } = renderResultado(resultado);
+  const carga = ctx.chat ? flujosGuiados.get(ctx.chat.id)?.carga : undefined;
+  const { texto, teclado } = renderResultado(resultado, carga);
   if (!texto) return;
   const partes = dividirMensaje(texto);
   for (let i = 0; i < partes.length; i++) {
@@ -197,7 +220,10 @@ bot.on("message:text", async (ctx) => {
       await responderFlujo(ctx, resultado);
       return;
     }
+    // Se toca el menú (o se pregunta otra cosa) a mitad de una carga: se cancela, pero avisando.
+    const titulo = FLUJOS[estadoFlujo.pila[0]!.flowId].titulo;
     cancelarFlujo(estadoFlujo);
+    await ctx.reply(`⚠️ Dejé sin terminar la carga de ${titulo}. Si querés, empezala de nuevo.`);
   }
 
   // 2) Accesos fijos del menú principal (sin IA): son consultas deterministas, no requieren
@@ -243,25 +269,32 @@ bot.on("message:text", async (ctx) => {
 bot.on("callback_query:data", async (ctx) => {
   const datos = ctx.callbackQuery.data;
   await ctx.answerCallbackQuery();
-  try {
-    await ctx.editMessageReplyMarkup(); // saca el teclado del mensaje ya presionado
-  } catch {
-    // el mensaje puede ser muy viejo para editarlo; no es grave, seguimos igual.
-  }
+  await dejarEleccionEscrita(ctx, datos);
   const chatId = ctx.chat!.id;
 
   // Botones de un flujo guiado (etapa 9): siempre se resuelven por el motor, nunca por OpenAI.
   if (esCallbackFlujo(datos)) {
-    const { accion, valor } = parseCallbackFlujo(datos);
+    const { accion, valor, carga } = parseCallbackFlujo(datos);
     const estadoFlujo = estadoFlujoDe(chatId);
-    if (accion === "iniciar" && valor) {
-      await responderFlujo(ctx, await iniciarFlujo(estadoFlujo, valor as FlowId));
+    const botonViejo =
+      accion !== "iniciar" && (!flujoActivo(estadoFlujo) || (carga !== undefined && carga !== estadoFlujo.carga));
+    if (botonViejo) {
+      await ctx.reply(
+        "Ese botón es de una carga que ya terminó o se canceló. Empezala de nuevo desde ➕ Nueva carga.",
+        {
+          reply_markup: menuPrincipalKeyboard,
+        },
+      );
       return;
     }
-    if (accion === CALLBACK_CANCELAR && !flujoActivo(estadoFlujo)) {
-      // Cancelar sin ningún flujo activo (ej. doble tap) no debería pasar, pero por las dudas
-      // no hace falta ni tocar el motor.
-      await ctx.reply("Cancelado.");
+    if (accion === "iniciar" && valor) {
+      if (flujoActivo(estadoFlujo)) {
+        // Empezar otra carga con una a medias: se cancela la anterior (avisando) para no mezclarlas.
+        const titulo = FLUJOS[estadoFlujo.pila[0]!.flowId].titulo;
+        cancelarFlujo(estadoFlujo);
+        await ctx.reply(`⚠️ Dejé sin terminar la carga de ${titulo}.`);
+      }
+      await responderFlujo(ctx, await iniciarFlujo(estadoFlujo, valor as FlowId));
       return;
     }
     await responderFlujo(ctx, await procesarSeleccion(estadoFlujo, accion, valor));
@@ -281,6 +314,37 @@ bot.on("callback_query:data", async (ctx) => {
     } catch (error) {
       console.error("Error procesando la consulta:", error);
       await ctx.reply("No pude hacer la consulta. Revisá la conexión a la base de datos.");
+    }
+    return;
+  }
+
+  // Botones de acción ("💰 Registrar pago", "📄 Ver contrato"...): sin OpenAI, salvo el de IPC.
+  if (esCallbackAccion(datos)) {
+    try {
+      const accion = await resolverAccion(datos);
+      if (accion?.tipo === "flujo") {
+        const estadoFlujo = estadoFlujoDe(chatId);
+        cancelarFlujo(estadoFlujo); // arranca limpio aunque hubiera otra carga a medias
+        await responderFlujo(ctx, await iniciarFlujo(estadoFlujo, accion.flowId, accion.datos));
+        return;
+      }
+      if (accion?.tipo === "respuesta") {
+        const partes = dividirMensaje(accion.texto);
+        for (let i = 0; i < partes.length; i++) {
+          const esUltima = i === partes.length - 1;
+          await ctx.reply(partes[i]!, esUltima && accion.teclado ? { reply_markup: accion.teclado } : undefined);
+        }
+        return;
+      }
+      if (accion?.tipo === "ia") {
+        await ctx.replyWithChatAction("typing");
+        await responder(ctx, await sesionDe(chatId).enviarMensaje(accion.texto));
+        return;
+      }
+      console.warn(`acción desconocida: ${datos}`);
+    } catch (error) {
+      console.error("Error procesando el botón:", error);
+      await ctx.reply("Uf, ocurrió un error procesando tu pedido. Probá de nuevo en un momento.");
     }
     return;
   }

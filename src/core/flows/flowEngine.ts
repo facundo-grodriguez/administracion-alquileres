@@ -9,6 +9,7 @@ import type {
   FlowId,
   FlowState,
   PasoFlujo,
+  ReferenciaEntidad,
   ResultadoFlujo,
 } from "./types.js";
 import { etiquetaKey } from "./types.js";
@@ -98,7 +99,10 @@ async function renderDesde(estado: FlowState, registro: RegistroFlujos): Promise
 
   while (frame.pasoActual < definicion.pasos.length) {
     const paso = definicion.pasos[frame.pasoActual]!;
-    if (paso.saltar?.(frame.datos)) {
+    // Un paso ya completado de antemano (datos iniciales, ej. el contrato elegido desde un botón)
+    // no se vuelve a preguntar. La confirmación final se muestra siempre.
+    const yaCompleto = paso.campo.tipo !== "confirmacion" && frame.datos[paso.id] !== undefined;
+    if (yaCompleto || paso.saltar?.(frame.datos)) {
       frame.pasoActual += 1;
       continue;
     }
@@ -126,10 +130,23 @@ async function renderDesde(estado: FlowState, registro: RegistroFlujos): Promise
   return { tipo: "cancelado", texto: "No quedaba nada más por completar en este paso." };
 }
 
-/** Avanza al próximo paso (tras resolver el actual) y renderiza. */
-function siguientePaso(estado: FlowState, registro: RegistroFlujos): Promise<ResultadoFlujo> {
+/** Avanza al próximo paso (tras resolver el actual) y renderiza. Antes corre la validación del paso, si tiene. */
+async function siguientePaso(estado: FlowState, registro: RegistroFlujos): Promise<ResultadoFlujo> {
   const frame = tope(estado);
-  if (!frame) return Promise.resolve({ tipo: "sin_flujo" });
+  if (!frame) return { tipo: "sin_flujo" };
+  const pasos = registro[frame.flowId].pasos;
+  const aviso = await pasos[frame.pasoActual]?.validar?.(frame.datos);
+  if (aviso) {
+    const destino = aviso.volverA ? pasos.findIndex((p) => p.id === aviso.volverA) : -1;
+    const desde = destino >= 0 && destino <= frame.pasoActual ? destino : frame.pasoActual;
+    for (const p of pasos.slice(desde, frame.pasoActual + 1)) {
+      frame.datos[p.id] = undefined;
+      frame.datos[etiquetaKey(p.id)] = undefined;
+    }
+    frame.pasoActual = desde;
+    const repregunta = await renderDesde(estado, registro);
+    return "texto" in repregunta ? { ...repregunta, texto: `${aviso.mensaje}\n\n${repregunta.texto}` } : repregunta;
+  }
   frame.pasoActual += 1;
   return renderDesde(estado, registro);
 }
@@ -140,6 +157,7 @@ export function iniciarFlujo(
   datosIniciales: DatosFlujo = {},
   registro: RegistroFlujos = FLUJOS,
 ): Promise<ResultadoFlujo> {
+  estado.carga = (estado.carga ?? 0) + 1;
   estado.pila.push({ flowId, pasoActual: 0, datos: datosIniciales });
   return renderDesde(estado, registro);
 }
@@ -174,9 +192,18 @@ async function finalizarFrameSuperior(estado: FlowState, registro: RegistroFlujo
   const frame = estado.pila.pop();
   if (!frame) return { tipo: "sin_flujo" };
   const definicion = registro[frame.flowId];
-  const resultadoTexto = await definicion.ejecutar(frame.datos);
+  const resultado = await definicion.ejecutar(frame.datos);
+  const rechazado = typeof resultado !== "string";
+  const resultadoTexto = typeof resultado === "string" ? resultado : resultado.texto;
 
   const padre = tope(estado);
+  if (padre && frame.campoDestino && rechazado) {
+    // El alta inline no se pudo hacer: se avisa y se vuelve a preguntar el mismo paso del padre.
+    const repregunta = await renderDesde(estado, registro);
+    return "texto" in repregunta
+      ? { ...repregunta, texto: `${limpiarMarcadorId(resultadoTexto)}\n\n${repregunta.texto}` }
+      : repregunta;
+  }
   if (padre && frame.campoDestino) {
     const id = extraerId(resultadoTexto);
     if (id) {
@@ -186,10 +213,22 @@ async function finalizarFrameSuperior(estado: FlowState, registro: RegistroFlujo
     return siguientePaso(estado, registro);
   }
 
+  if (rechazado) return { tipo: "completado", texto: limpiarMarcadorId(resultadoTexto) };
+
+  // Referencia para los botones posteriores: lo elegido en el flujo, o lo recién creado.
+  const idCreado = extraerId(resultadoTexto);
+  const referencia: ReferenciaEntidad = {
+    propiedadId:
+      (frame.datos.propiedad_id as string | undefined) ?? (frame.flowId === "crear_propiedad" ? idCreado : undefined),
+    contratoId:
+      (frame.datos.contrato_id as string | undefined) ?? (frame.flowId === "crear_contrato" ? idCreado : undefined),
+  };
+
   return {
     tipo: "completado",
     texto: limpiarMarcadorId(resultadoTexto),
     botonesPostAccion: definicion.botonesPostAccion,
+    referencia,
   };
 }
 

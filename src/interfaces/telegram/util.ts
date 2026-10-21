@@ -12,3 +12,10 @@ export function dividirMensaje(texto: string, max = 4000): string[] {
   if (resto.length > 0) partes.push(resto);
   return partes;
 }
+
+/** Texto del mensaje con la opción elegida agregada abajo, sin pasarse del límite de Telegram. */
+export function textoConEleccion(texto: string, elegido: string, max = 4096): string {
+  const sufijo = `\n\n👉 ${elegido}`;
+  const base = texto.length + sufijo.length > max ? `${texto.slice(0, max - sufijo.length - 1)}…` : texto;
+  return `${base}${sufijo}`;
+}

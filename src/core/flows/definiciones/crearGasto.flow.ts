@@ -4,7 +4,7 @@ import { formatoARS } from "../../util/formato.js";
 import { buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
 import { type DefinicionFlujo, etiquetaKey } from "../types.js";
 
-const TIPOS_GASTO = [
+export const TIPOS_GASTO = [
   { valor: "expensas", etiqueta: "Expensas" },
   { valor: "ABL", etiqueta: "ABL" },
   { valor: "ARBA", etiqueta: "ARBA" },

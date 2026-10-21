@@ -42,6 +42,19 @@ export async function buscarContratoVigentePorInquilino(inquilinoId: string) {
   });
 }
 
+/** Contratos vigentes de una propiedad cuyas fechas se pisan con el rango dado. */
+export async function buscarSuperpuestos(propiedadId: string, fechaInicio: string, fechaFin: string) {
+  return db.query.contratos.findMany({
+    where: and(
+      eq(contratos.propiedadId, propiedadId),
+      eq(contratos.estado, "vigente"),
+      lte(contratos.fechaInicio, fechaFin),
+      gte(contratos.fechaFin, fechaInicio),
+    ),
+    with: conRelaciones,
+  });
+}
+
 export async function listarContratosPorVencer(desde: string, hasta: string) {
   return db.query.contratos.findMany({
     where: and(eq(contratos.estado, "vigente"), gte(contratos.fechaFin, desde), lte(contratos.fechaFin, hasta)),

@@ -2,9 +2,29 @@ import { z } from "zod";
 import * as contratosRepo from "../../repositories/contratos.repository.js";
 import * as personasRepo from "../../repositories/personas.repository.js";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
-import { formatoFechaAR } from "../../util/fecha.js";
+import { formatoFechaAR, sumarDiasISO } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { defineTool } from "../defineTool.js";
+
+/**
+ * Si la propiedad ya tiene un contrato vigente que se pisa con esas fechas, devuelve el aviso
+ * (y no se debe crear el contrato). Una renovación que arranca después del fin del actual pasa.
+ */
+export async function validarSuperposicion(
+  propiedadId: string,
+  fechaInicio: string,
+  fechaFin: string,
+): Promise<string | undefined> {
+  if (fechaFin < fechaInicio) return "⚠️ No cargué el contrato: la fecha de finalización es anterior a la de inicio.";
+  const superpuestos = await contratosRepo.buscarSuperpuestos(propiedadId, fechaInicio, fechaFin);
+  const actual = superpuestos[0];
+  if (!actual) return undefined;
+  return [
+    `⚠️ No cargué el contrato: ${actual.propiedad.direccion} ya tiene un contrato vigente con ` +
+      `${actual.inquilino.nombreCompleto} del ${formatoFechaAR(actual.fechaInicio)} al ${formatoFechaAR(actual.fechaFin)}.`,
+    `Si es una renovación, el contrato nuevo tiene que empezar a partir del ${formatoFechaAR(sumarDiasISO(actual.fechaFin, 1))}.`,
+  ].join("\n");
+}
 
 export const crearContratoTool = defineTool({
   name: "crear_contrato",
@@ -12,7 +32,8 @@ export const crearContratoTool = defineTool({
     "Da de alta un contrato de alquiler. Requiere IDs de propiedad e inquilino ya existentes " +
     "(usar buscar_propiedad / buscar_persona / crear_persona primero). Siempre preguntá la frecuencia " +
     "de actualización del alquiler, no la asumas. Si el contrato tiene Seguro Finaer, se puede cargar acá " +
-    "o después con cargar_seguro_finaer.",
+    "o después con cargar_seguro_finaer. No permite cargar un contrato que se pise en fechas con otro vigente " +
+    "de la misma propiedad: si pasa, avisale al usuario tal cual lo que devuelve.",
   inputSchema: z.object({
     propiedad_id: z.string(),
     inquilino_id: z.string(),
@@ -38,6 +59,9 @@ export const crearContratoTool = defineTool({
     finaer_fecha_vencimiento: z.string().optional().describe("YYYY-MM-DD"),
   }),
   run: async (input) => {
+    const aviso = await validarSuperposicion(input.propiedad_id, input.fecha_inicio, input.fecha_fin);
+    if (aviso) return aviso;
+
     const contrato = await contratosRepo.crearContrato(
       {
         propiedadId: input.propiedad_id,

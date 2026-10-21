@@ -31,7 +31,38 @@ const TOOL_A_CONTEXTO_INFERIDO: Record<string, ContextoTeclado> = {
   crear_gasto: "post_gasto",
 };
 
-export type RespuestaAsistente = { texto: string; teclado?: ContextoTeclado };
+export type RespuestaAsistente = {
+  texto: string;
+  teclado?: ContextoTeclado;
+  /** Propiedad/contrato del que se habló (para que los botones no vuelvan a preguntar). */
+  referencia?: { propiedadId?: string; contratoId?: string };
+};
+
+/** Propiedad/contrato al que apunta una tool ejecutada con éxito, a partir de sus argumentos y su resultado. */
+function referenciaDeTool(nombre: string, argumentosJson: string, resultado: string) {
+  let args: Record<string, unknown> = {};
+  try {
+    args = JSON.parse(argumentosJson || "{}");
+  } catch {
+    return undefined;
+  }
+  const idCreado = resultado.match(/\(id: ([^)]+)\)/)?.[1];
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  switch (nombre) {
+    case "crear_propiedad":
+      return { propiedadId: idCreado };
+    case "crear_contrato":
+      return { propiedadId: str(args.propiedad_id), contratoId: idCreado };
+    case "crear_recibo":
+    case "cargar_seguro_finaer":
+      return { contratoId: str(args.contrato_id) };
+    case "crear_gasto":
+    case "listar_gastos":
+      return { propiedadId: str(args.propiedad_id) };
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Una conversación con el asistente. Mantiene el historial de mensajes para dar continuidad.
@@ -54,6 +85,7 @@ export class ChatSession {
     // por sobre lo inferido automáticamente de una tool de alta exitosa (más específico).
     let contextoSenalado: ContextoTeclado | undefined;
     let contextoInferido: ContextoTeclado | undefined;
+    let referencia: RespuestaAsistente["referencia"];
 
     for (let iteracion = 0; iteracion < MAX_ITERACIONES_TOOLS; iteracion++) {
       const response = await openai.chat.completions.create({
@@ -82,6 +114,7 @@ export class ChatSession {
         return {
           texto: mensaje.content?.trim() || "(No obtuve una respuesta en texto.)",
           teclado: contextoSenalado ?? contextoInferido,
+          referencia,
         };
       }
 
@@ -89,10 +122,11 @@ export class ChatSession {
         const { ok, contenido } = await ejecutarTool(toolCall);
         this.messages.push({ role: "tool", tool_call_id: toolCall.id, content: contenido });
         if (!ok || toolCall.type !== "function") continue;
+        referencia = referenciaDeTool(toolCall.function.name, toolCall.function.arguments, contenido) ?? referencia;
 
         if (toolCall.function.name === "sugerir_botones") {
           contextoSenalado = extraerContexto(toolCall.function.arguments);
-        } else if (toolCall.function.name in TOOL_A_CONTEXTO_INFERIDO) {
+        } else if (toolCall.function.name in TOOL_A_CONTEXTO_INFERIDO && !contenido.startsWith("⚠️")) {
           contextoInferido = TOOL_A_CONTEXTO_INFERIDO[toolCall.function.name];
         }
       }
