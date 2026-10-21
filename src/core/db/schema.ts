@@ -44,7 +44,8 @@ export const tipoGastoEnum = pgEnum("tipo_gasto", [
   "agua",
   "internet",
   "seguro_hogar",
-  "seguro_incendio",
+  "seguro_incendio", // ya no se ofrece al cargar; se conserva por los gastos viejos
+  "reparacion",
   "otro",
 ]);
 export const estadoGastoEnum = pgEnum("estado_gasto", ["pendiente", "pagado"]);

@@ -9,16 +9,20 @@ export function esCallbackFlujo(datos: string): boolean {
   return datos.startsWith(PREFIJO);
 }
 
-/** "flujo:<accion>[:<valor>][~<carga>]" — la carga identifica a qué flujo pertenece el botón. */
-export function parseCallbackFlujo(datos: string): { accion: string; valor?: string; carga?: number } {
-  const [cuerpo = "", cargaTexto] = datos.split("~");
+/**
+ * "flujo:<accion>[:<valor>][~<marca>]" — la marca ("<carga>.<nivel>.<paso>", ver `marcaPasoActual`)
+ * identifica la carga y la pregunta a la que pertenece el botón.
+ */
+export function parseCallbackFlujo(datos: string): { accion: string; valor?: string; marca?: string; carga?: number } {
+  const [cuerpo = "", marca] = datos.split("~");
   const [, accion, ...resto] = cuerpo.split(":");
+  const cargaTexto = marca?.split(".")[0];
   const carga = cargaTexto !== undefined && /^\d+$/.test(cargaTexto) ? Number(cargaTexto) : undefined;
-  return { accion: accion ?? "", valor: resto.length > 0 ? resto.join(":") : undefined, carga };
+  return { accion: accion ?? "", valor: resto.length > 0 ? resto.join(":") : undefined, marca, carga };
 }
 
-/** Marca los botones de un flujo con su número de carga (menos "iniciar", que siempre vale). */
-function marcarCarga(teclado: InlineKeyboard | undefined, carga: number | undefined): InlineKeyboard | undefined {
+/** Agrega la marca del paso a los botones de un flujo (menos "iniciar", que siempre vale). */
+function marcarCarga(teclado: InlineKeyboard | undefined, carga: string | undefined): InlineKeyboard | undefined {
   if (!teclado || carga === undefined) return teclado;
   for (const fila of teclado.inline_keyboard) {
     for (const boton of fila) {
@@ -98,10 +102,10 @@ function tecladoParaCampo(campo: CampoFlujo): InlineKeyboard {
 /** Convierte el resultado del motor de flujos en un mensaje listo para mandar por Telegram. */
 export function renderResultado(
   resultado: ResultadoFlujo,
-  carga?: number,
+  marca?: string,
 ): { texto: string; teclado?: InlineKeyboard } {
   const r = renderSinCarga(resultado);
-  return { texto: r.texto, teclado: marcarCarga(r.teclado, carga) };
+  return { texto: r.texto, teclado: marcarCarga(r.teclado, marca) };
 }
 
 function renderSinCarga(resultado: ResultadoFlujo): { texto: string; teclado?: InlineKeyboard } {

@@ -37,11 +37,12 @@ export async function marcarPagado(input: {
 }
 
 /**
- * Corrige un gasto ya cargado (monto, vencimiento y/o fecha de pago). Si queda pagado y con monto,
+ * Corrige un gasto ya cargado (tipo, monto, vencimiento y/o fecha de pago). Si queda pagado y con monto,
  * el balance se actualiza con los valores nuevos.
  */
 export async function corregir(input: {
   gastoId: string;
+  tipo?: GastoPropiedad["tipo"];
   monto?: string;
   fechaVencimiento?: string;
   fechaPago?: string;
@@ -51,6 +52,7 @@ export async function corregir(input: {
   const antes = await gastosRepo.obtenerPorId(input.gastoId);
   if (!antes) return undefined;
   const despues = await gastosRepo.actualizarGasto(input.gastoId, {
+    tipo: input.tipo,
     monto: input.monto,
     fechaVencimiento: input.fechaVencimiento,
     fechaPago: input.fechaPago,

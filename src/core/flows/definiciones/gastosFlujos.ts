@@ -4,6 +4,10 @@ import * as gastosService from "../../services/gastosPropiedad.service.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { type CandidatoFlujo, type DefinicionFlujo, etiquetaKey } from "../types.js";
+import { TIPOS_GASTO } from "./crearGasto.flow.js";
+
+const MANTENER = "mantener";
+const etiquetaTipo = (valor: unknown) => TIPOS_GASTO.find((t) => t.valor === valor)?.etiqueta ?? String(valor);
 
 type GastoConPropiedad = Awaited<ReturnType<typeof gastosRepo.listarRecientes>>[number];
 
@@ -82,6 +86,11 @@ export const corregirGastoFlow: DefinicionFlujo = {
       campo: { tipo: "entidad", buscar: async (q) => filtrar(await gastosRepo.listarRecientes(), q) },
     },
     {
+      id: "tipo",
+      pregunta: () => "¿Cambiar el tipo de gasto? (ej. de Otro a Arreglo / reparación)",
+      campo: { tipo: "opciones", opciones: [{ valor: MANTENER, etiqueta: "↩️ Dejarlo igual" }, ...TIPOS_GASTO] },
+    },
+    {
       id: "monto",
       pregunta: () => "¿Monto correcto? Tocá Omitir para dejarlo como está.",
       campo: { tipo: "monto", opcional: true },
@@ -103,10 +112,13 @@ export const corregirGastoFlow: DefinicionFlujo = {
           "Confirmá la corrección:",
           "",
           `Gasto: ${datos[etiquetaKey("gasto_id")]}`,
+          datos.tipo && datos.tipo !== MANTENER ? `Tipo nuevo: ${etiquetaTipo(datos.tipo)}` : null,
           datos.monto ? `Monto nuevo: ${formatoARS(datos.monto as string)}` : null,
           datos.fecha_vencimiento ? `Vencimiento nuevo: ${formatoFechaAR(datos.fecha_vencimiento as string)}` : null,
           datos.fecha_pago ? `Fecha de pago: ${formatoFechaAR(datos.fecha_pago as string)}` : null,
-          !datos.monto && !datos.fecha_vencimiento && !datos.fecha_pago ? "(no cambiaste nada)" : null,
+          (!datos.tipo || datos.tipo === MANTENER) && !datos.monto && !datos.fecha_vencimiento && !datos.fecha_pago
+            ? "(no cambiaste nada)"
+            : null,
         ]
           .filter(Boolean)
           .join("\n"),
@@ -116,6 +128,10 @@ export const corregirGastoFlow: DefinicionFlujo = {
   ejecutar: async (datos) => {
     const resultado = await gastosService.corregir({
       gastoId: datos.gasto_id as string,
+      tipo:
+        datos.tipo && datos.tipo !== MANTENER
+          ? (datos.tipo as Parameters<typeof gastosService.corregir>[0]["tipo"])
+          : undefined,
       monto: (datos.monto as string | undefined) || undefined,
       fechaVencimiento: (datos.fecha_vencimiento as string | undefined) || undefined,
       fechaPago: (datos.fecha_pago as string | undefined) || undefined,
@@ -124,6 +140,7 @@ export const corregirGastoFlow: DefinicionFlujo = {
     const { antes, despues } = resultado;
     const cambio = (nombre: string, a: string, b: string) => (a === b ? null : `${nombre}: ${a} → ${b}`);
     const cambios = [
+      cambio("Tipo", etiquetaTipo(antes.tipo), etiquetaTipo(despues.tipo)),
       cambio("Monto", formatoARS(antes.monto), formatoARS(despues.monto)),
       cambio("Vencimiento", formatoFechaAR(antes.fechaVencimiento), formatoFechaAR(despues.fechaVencimiento)),
       cambio(

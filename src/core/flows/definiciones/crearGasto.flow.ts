@@ -13,7 +13,7 @@ export const TIPOS_GASTO = [
   { valor: "agua", etiqueta: "Agua" },
   { valor: "internet", etiqueta: "Internet" },
   { valor: "seguro_hogar", etiqueta: "Seguro hogar" },
-  { valor: "seguro_incendio", etiqueta: "Seguro incendio" },
+  { valor: "reparacion", etiqueta: "🔧 Arreglo / reparación" },
   { valor: "otro", etiqueta: "Otro" },
 ];
 
@@ -93,7 +93,7 @@ export const crearGastoFlow: DefinicionFlujo = {
         | "agua"
         | "internet"
         | "seguro_hogar"
-        | "seguro_incendio"
+        | "reparacion"
         | "otro",
       fecha_vencimiento: datos.fecha_vencimiento as string,
       responsable:

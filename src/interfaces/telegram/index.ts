@@ -4,11 +4,13 @@ import type { Context } from "grammy";
 import { Bot, webhookCallback } from "grammy";
 import { env } from "../../config/env.js";
 import { ChatSession, type RespuestaAsistente } from "../../core/assistant/chatSession.js";
+import { asegurarEsquema } from "../../core/db/asegurarEsquema.js";
 import { FLUJOS } from "../../core/flows/definiciones/index.js";
 import {
   cancelarFlujo,
   flujoActivo,
   iniciarFlujo,
+  marcaPasoActual,
   procesarSeleccion,
   procesarTexto,
 } from "../../core/flows/flowEngine.js";
@@ -52,6 +54,9 @@ if (!env.TELEGRAM_BOT_TOKEN) {
 }
 
 const bot = new Bot(env.TELEGRAM_BOT_TOKEN);
+
+// Antes de atender mensajes: cambios de esquema pendientes (idempotentes, ver asegurarEsquema.ts).
+await asegurarEsquema();
 
 // Una conversación (con su historial) por chat de Telegram.
 const sesiones = new Map<number, ChatSession>();
@@ -139,8 +144,8 @@ async function responder(ctx: Context, respuesta: RespuestaAsistente): Promise<v
 
 /** Manda el resultado de un paso de flujo guiado (etapa 9), sin pasar por OpenAI en ningún caso. */
 async function responderFlujo(ctx: Context, resultado: ResultadoFlujo): Promise<void> {
-  const carga = ctx.chat ? flujosGuiados.get(ctx.chat.id)?.carga : undefined;
-  const { texto, teclado } = renderResultado(resultado, carga);
+  const estado = ctx.chat ? flujosGuiados.get(ctx.chat.id) : undefined;
+  const { texto, teclado } = renderResultado(resultado, estado ? marcaPasoActual(estado) : undefined);
   if (!texto) return;
   const partes = dividirMensaje(texto);
   for (let i = 0; i < partes.length; i++) {
@@ -274,11 +279,14 @@ bot.on("callback_query:data", async (ctx) => {
 
   // Botones de un flujo guiado (etapa 9): siempre se resuelven por el motor, nunca por OpenAI.
   if (esCallbackFlujo(datos)) {
-    const { accion, valor, carga } = parseCallbackFlujo(datos);
+    const { accion, valor, marca, carga } = parseCallbackFlujo(datos);
     const estadoFlujo = estadoFlujoDe(chatId);
-    const botonViejo =
-      accion !== "iniciar" && (!flujoActivo(estadoFlujo) || (carga !== undefined && carga !== estadoFlujo.carga));
-    if (botonViejo) {
+    const otraCarga = !flujoActivo(estadoFlujo) || (carga !== undefined && carga !== estadoFlujo.carga);
+    if (accion !== "iniciar" && !otraCarga && marca !== undefined && marca !== marcaPasoActual(estadoFlujo)) {
+      // Botón de una pregunta ya contestada de esta misma carga (doble toque o update reenviado): se ignora.
+      return;
+    }
+    if (accion !== "iniciar" && otraCarga) {
       await ctx.reply(
         "Ese botón es de una carga que ya terminó o se canceló. Empezala de nuevo desde ➕ Nueva carga.",
         {

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."tipo_gasto" ADD VALUE IF NOT EXISTS 'reparacion' BEFORE 'otro';

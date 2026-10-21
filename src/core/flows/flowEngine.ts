@@ -48,6 +48,17 @@ export function flujoActivo(estado: FlowState): boolean {
   return estado.pila.length > 0;
 }
 
+/**
+ * Marca del paso que se está mostrando ("<carga>.<nivel>.<paso>"): viaja en los botones para que cada
+ * botón valga solo para la pregunta en la que apareció — un doble toque o un update que Telegram
+ * reenvía no contesta por error la pregunta siguiente.
+ */
+export function marcaPasoActual(estado: FlowState): string | undefined {
+  const frame = tope(estado);
+  if (!frame) return undefined;
+  return `${estado.carga ?? 0}.${estado.pila.length}.${frame.pasoActual}`;
+}
+
 export function cancelarFlujo(estado: FlowState): void {
   estado.pila.length = 0;
 }

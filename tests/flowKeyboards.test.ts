@@ -190,18 +190,18 @@ describe("tecladoNuevaCarga", () => {
   });
 });
 
-describe("botones de flujo con número de carga", () => {
-  it("marca los botones del flujo y el parse lo lee", () => {
+describe("botones de flujo con marca de paso", () => {
+  it("marca los botones del flujo y el parse la lee", () => {
     const { teclado } = renderResultado(
       { tipo: "candidatos", texto: "¿Cuál?", candidatos: [{ id: "a", etiqueta: "A" }] },
-      7,
+      "7.1.3",
     );
-    const datos = botones(teclado);
-    expect(datos).toEqual(["flujo:sel:0~7", "flujo:cancelar~7"]);
-    expect(parseCallbackFlujo("flujo:sel:0~7")).toEqual({ accion: "sel", valor: "0", carga: 7 });
+    expect(botones(teclado)).toEqual(["flujo:sel:0~7.1.3", "flujo:cancelar~7.1.3"]);
+    expect(parseCallbackFlujo("flujo:sel:0~7.1.3")).toEqual({ accion: "sel", valor: "0", marca: "7.1.3", carga: 7 });
     expect(parseCallbackFlujo("flujo:iniciar:crear_gasto")).toEqual({
       accion: "iniciar",
       valor: "crear_gasto",
+      marca: undefined,
       carga: undefined,
     });
   });

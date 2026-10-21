@@ -8,8 +8,18 @@ import { crearGastos, gastosCargados, pasosGastos, resumenGastos } from "./carga
 const MEDIOS_PAGO = [
   { valor: "transferencia", etiqueta: "Transferencia" },
   { valor: "efectivo", etiqueta: "Efectivo" },
+  { valor: "ambos", etiqueta: "Efectivo + transferencia" },
   { valor: "omitir", etiqueta: "Omitir" },
 ];
+
+/** Texto del medio de pago tal como queda guardado (ej. "efectivo $ 200.000 + transferencia $ 250.000"). */
+export function medioPagoTexto(datos: Record<string, unknown>): string | undefined {
+  if (datos.medio_pago === "omitir" || datos.medio_pago === undefined) return undefined;
+  if (datos.medio_pago !== "ambos") return datos.medio_pago as string;
+  const efectivo = Number(datos.monto_efectivo);
+  const transferencia = Number(datos.monto) - efectivo;
+  return `efectivo ${formatoARS(efectivo)} + transferencia ${formatoARS(transferencia)}`;
+}
 
 export const crearReciboFlow: DefinicionFlujo = {
   id: "crear_recibo",
@@ -30,6 +40,17 @@ export const crearReciboFlow: DefinicionFlujo = {
       id: "medio_pago",
       pregunta: () => "¿Medio de pago? (opcional)",
       campo: { tipo: "opciones", opciones: MEDIOS_PAGO },
+    },
+    {
+      id: "monto_efectivo",
+      pregunta: (datos) =>
+        `¿Cuánto fue en efectivo? El resto de ${formatoARS(datos.monto as string)} queda como transferencia.`,
+      campo: { tipo: "monto" },
+      saltar: (datos) => datos.medio_pago !== "ambos",
+      validar: async (datos) =>
+        Number(datos.monto_efectivo) >= Number(datos.monto)
+          ? { mensaje: `⚠️ El efectivo tiene que ser menor que el total (${formatoARS(datos.monto as string)}).` }
+          : undefined,
     },
     {
       id: "con_servicios",
@@ -57,7 +78,7 @@ export const crearReciboFlow: DefinicionFlujo = {
           `Contrato: ${datos[etiquetaKey("contrato_id")]}`,
           `Período: ${datos.periodo}`,
           `Importe: ${formatoARS(datos.monto as string)}`,
-          datos.medio_pago && datos.medio_pago !== "omitir" ? `Medio de pago: ${datos.medio_pago}` : null,
+          medioPagoTexto(datos) ? `Medio de pago: ${medioPagoTexto(datos)}` : null,
           ...(gastosCargados(datos).length > 0
             ? ["", "Servicios pagados:", ...resumenGastos(gastosCargados(datos))]
             : []),
@@ -73,7 +94,7 @@ export const crearReciboFlow: DefinicionFlujo = {
       periodo: datos.periodo as string,
       monto: datos.monto as string,
       fecha_pago: datos.fecha_pago as string,
-      medio_pago: datos.medio_pago === "omitir" ? undefined : (datos.medio_pago as string | undefined),
+      medio_pago: medioPagoTexto(datos),
     });
     const gastos = gastosCargados(datos);
     if (gastos.length === 0) return textoPago;

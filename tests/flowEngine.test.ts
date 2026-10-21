@@ -507,3 +507,61 @@ describe("flujo real de pago con servicios (crear_recibo)", () => {
     expect("texto" in r && r.texto).toContain("Confirmá el pago");
   });
 });
+
+describe("marcaPasoActual", () => {
+  it("cambia al avanzar de paso y con cada carga nueva", async () => {
+    const { marcaPasoActual } = await import("../src/core/flows/flowEngine.js");
+    const registro = registroCon(async () => [{ id: "r1", etiqueta: "Responsable 1" }]);
+    const estado = crearEstadoFlujo();
+    expect(marcaPasoActual(estado)).toBeUndefined();
+    await iniciarFlujo(estado, "crear_persona", {}, registro);
+    const antes = marcaPasoActual(estado);
+    await procesarSeleccion(estado, "opt", "inquilino", registro);
+    const despues = marcaPasoActual(estado);
+    expect(antes).not.toBe(despues);
+    await iniciarFlujo(crearEstadoFlujo(), "crear_persona", {}, registro);
+    estado.pila = [];
+    await iniciarFlujo(estado, "crear_persona", {}, registro);
+    expect(marcaPasoActual(estado)?.startsWith("2.")).toBe(true);
+  });
+});
+
+describe("marcaPasoActual", () => {
+  it("cambia al avanzar de paso y con cada carga nueva", async () => {
+    const { marcaPasoActual } = await import("../src/core/flows/flowEngine.js");
+    const registro = registroCon(async () => []);
+    const estado = crearEstadoFlujo();
+    expect(marcaPasoActual(estado)).toBeUndefined();
+    await iniciarFlujo(estado, "crear_persona", {}, registro);
+    const antes = marcaPasoActual(estado);
+    await procesarSeleccion(estado, "opt", "inquilino", registro);
+    expect(marcaPasoActual(estado)).not.toBe(antes);
+    estado.pila = [];
+    await iniciarFlujo(estado, "crear_persona", {}, registro);
+    expect(marcaPasoActual(estado)?.startsWith("2.")).toBe(true);
+  });
+});
+
+describe("medio de pago mixto en crear_recibo", () => {
+  it("pide el efectivo, valida que sea menor al total y arma el texto", async () => {
+    const { crearReciboFlow, medioPagoTexto } = await import("../src/core/flows/definiciones/crearRecibo.flow.js");
+    const registro = registroCon(async () => []);
+    registro.crear_recibo = { ...crearReciboFlow, ejecutar: async () => "ok" };
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "crear_recibo", { contrato_id: "c1" }, registro);
+    await procesarTexto(estado, "10/2026", [], registro);
+    await procesarTexto(estado, "450000", [], registro);
+    await procesarSeleccion(estado, CALLBACK_HOY, undefined, registro);
+    const r = await procesarSeleccion(estado, "opt", "ambos", registro);
+    expect("texto" in r && r.texto).toContain("¿Cuánto fue en efectivo?");
+    const mal = await procesarTexto(estado, "500000", [], registro);
+    expect("texto" in mal && mal.texto).toContain("El efectivo tiene que ser menor");
+    const bien = await procesarTexto(estado, "200000", [], registro);
+    expect("texto" in bien && bien.texto).toContain("¿Pagó también servicios");
+
+    const texto = medioPagoTexto({ medio_pago: "ambos", monto: "450000", monto_efectivo: "200000" });
+    expect(texto).toMatch(/^efectivo .*200\.000 \+ transferencia .*250\.000$/);
+    expect(medioPagoTexto({ medio_pago: "omitir" })).toBeUndefined();
+    expect(medioPagoTexto({ medio_pago: "efectivo" })).toBe("efectivo");
+  });
+});

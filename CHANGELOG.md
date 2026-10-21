@@ -2,6 +2,26 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.6.0] — 2026-10-21 — Pago mixto, arreglos como gasto y fix de pregunta repetida
+> 💵 Medio de pago: efectivo + transferencia
+> 🔧 Nuevo tipo de gasto: Arreglo / reparación
+> 🛡️ Seguros: queda solo Seguro hogar
+> ✏️ Corregir gasto permite cambiar el tipo
+> 🔧 Un toque doble ya no repite ni salta preguntas
+
+- Tipo de gasto nuevo "Arreglo / reparación" (enum `tipo_gasto`, migración `0005`). El bot aplica ese
+  cambio solo al arrancar (`src/core/db/asegurarEsquema.ts`, idempotente y solo aditivo), así no hace
+  falta correr `npm run db:migrate` a mano. "Seguro incendio" deja de ofrecerse al cargar (los gastos
+  viejos con ese tipo se conservan).
+- "✏️ Modificar → 💡 Gasto" permite cambiar el tipo (ej. de Otro a Arreglo / reparación).
+- En "💰 Pago", la opción "Efectivo + transferencia" pregunta cuánto fue en efectivo (tiene que ser menor
+que el total) y el resto queda como transferencia; se guarda como "efectivo $X + transferencia $Y".
+
+Si un botón de una carga se procesaba dos veces (doble toque, o Telegram reenviando el mensaje mientras
+Render despierta), el segundo se tomaba como respuesta de la pregunta siguiente: o la repetía ("¿Quién
+los paga?" dos veces) o, peor, la contestaba sola. Ahora cada botón lleva la marca de su pregunta
+(carga, nivel y paso) y uno de una pregunta ya contestada se ignora.
+
 ## [9.5.0] — 2026-10-21 — Varios gastos de una vez, botones sin IA y contratos superpuestos
 > 💰 Al cargar el pago del alquiler, podés sumar los servicios que pagó
 > 🧾 Varios gastos: cargá todos los servicios juntos, ya pagos

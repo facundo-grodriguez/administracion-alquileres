@@ -9,24 +9,13 @@ import { defineTool } from "../defineTool.js";
 export const crearGastoTool = defineTool({
   name: "crear_gasto",
   description:
-    "Registra un gasto recurrente de una propiedad: expensas, ABL, ARBA, luz, gas, agua, internet, " +
-    "seguro hogar, seguro incendio, u otro. Es el mismo lugar para cualquier gasto, no importa el rubro. " +
+    "Registra un gasto de una propiedad: expensas, ABL, ARBA, luz, gas, agua, internet, " +
+    "seguro hogar, arreglo/reparación (ej: plomero, electricista), u otro. Es el mismo lugar para cualquier gasto, no importa el rubro. " +
     "Requiere el ID de la propiedad (usar buscar_propiedad primero). Si el gasto ya está pagado, pasar " +
     "fecha_pago (y monto) para que entre directo en el balance.",
   inputSchema: z.object({
     propiedad_id: z.string(),
-    tipo: z.enum([
-      "expensas",
-      "ABL",
-      "ARBA",
-      "luz",
-      "gas",
-      "agua",
-      "internet",
-      "seguro_hogar",
-      "seguro_incendio",
-      "otro",
-    ]),
+    tipo: z.enum(["expensas", "ABL", "ARBA", "luz", "gas", "agua", "internet", "seguro_hogar", "reparacion", "otro"]),
     fecha_vencimiento: z.string().describe("YYYY-MM-DD"),
     responsable: z.enum(["propietario", "inquilino"]).optional().describe("Quién paga este gasto, si se sabe"),
     monto: z.string().optional().describe("Ej: '30000'"),
