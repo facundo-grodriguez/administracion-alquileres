@@ -27,3 +27,9 @@ export async function registrarEnvio(tipo: string, fechaEvento: string, mensaje?
     mensaje,
   });
 }
+
+/** ¿Ya se registró alguna vez un recordatorio de este tipo (sin importar la fecha)? */
+export async function yaRegistradoAlgunaVez(tipo: string): Promise<boolean> {
+  const fila = await db.query.recordatorios.findFirst({ where: eq(recordatorios.tipo, tipo) });
+  return fila !== undefined;
+}

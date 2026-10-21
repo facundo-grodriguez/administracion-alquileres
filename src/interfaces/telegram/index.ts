@@ -18,6 +18,7 @@ import {
   hayActualizacionesVencidas,
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
+import { avisarVersionNueva } from "./avisoVersion.js";
 import { esCallbackConsulta, responderConsulta, tecladoConsultas } from "./consultas.js";
 import {
   esCallbackFlujo,
@@ -321,6 +322,12 @@ if (autorizados.size === 0) {
 } else {
   // El recordatorio diario se manda a los IDs autorizados (en chats privados, chat_id == user_id).
   iniciarSchedulerAgenda(bot, [...autorizados]);
+  // Se dispara una vez que el bot ya arrancó (ver más abajo): avisa de la versión nueva y refresca el menú.
+  setTimeout(() => {
+    avisarVersionNueva(bot, [...autorizados]).catch((error: unknown) =>
+      console.error("No pude mandar el aviso de versión:", error instanceof Error ? error.message : error),
+    );
+  }, 5000);
 }
 
 // Render (y otros hosts similares) exponen la URL pública en RENDER_EXTERNAL_URL automáticamente;

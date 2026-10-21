@@ -2,6 +2,12 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.3.0] — 2026-10-21 — Aviso automático de versión nueva
+Al arrancar una versión nueva, el bot le manda a los usuarios autorizados un mensaje "✅ Bot actualizado
+a vX.Y.Z" con las novedades (el título de esa versión en este CHANGELOG) y el menú principal actualizado:
+el teclado de Telegram se refresca solo, sin tener que mandar /start. Se avisa una sola vez por versión
+(queda registrado en la tabla `recordatorios`), así que los reinicios de Render no repiten el mensaje.
+
 ## [9.2.1] — 2026-10-18 — Botón de alquiler actual en Vencimientos
 La consulta "📆 Vencimientos (30 días)" ahora también ofrece el botón "⚡ Cargar alquiler actual" cuando
 hay una actualización de alquiler vencida (antes solo aparecía en "⚡ Actualizaciones de alquiler").
