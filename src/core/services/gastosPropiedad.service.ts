@@ -1,15 +1,21 @@
 import type { GastoPropiedad } from "../repositories/gastosPropiedad.repository.js";
 import * as gastosRepo from "../repositories/gastosPropiedad.repository.js";
 import * as movimientosRepo from "../repositories/movimientosFinancieros.repository.js";
+import { entraEnBalance, type Responsable, responsablePorDefecto } from "../util/responsableGasto.js";
 
 /**
  * Refleja un gasto pagado (y con monto) en movimientos_financieros, vía referenciaTipo="gasto_propiedad"
  * — es lo que lo hace aparecer en el balance. Best-effort: si falla, solo se loguea. Idempotente:
- * si el movimiento ya existía, lo corrige en vez de duplicarlo.
+ * si el movimiento ya existía, lo corrige en vez de duplicarlo. Lo que paga el inquilino no se
+ * descuenta del alquiler: no entra (y si estaba, se saca).
  */
 async function sincronizarMovimiento(gasto: GastoPropiedad): Promise<void> {
-  if (!gasto.monto || !gasto.fechaPago) return;
   try {
+    if (!entraEnBalance(gasto)) {
+      await movimientosRepo.eliminarPorReferencia("gasto_propiedad", gasto.id);
+      return;
+    }
+    if (!gasto.monto || !gasto.fechaPago) return;
     await movimientosRepo.upsertPorReferencia({
       propiedadId: gasto.propiedadId,
       tipo: "gasto",
@@ -37,7 +43,8 @@ export async function marcarPagado(input: {
 }
 
 /**
- * Corrige un gasto ya cargado (tipo, monto, vencimiento y/o fecha de pago). Si queda pagado y con monto,
+ * Corrige un gasto ya cargado (tipo, quién paga, monto, vencimiento y/o fecha de pago). Si cambia a un
+ * servicio y no se eligió quién paga, pasa a pagarlo el inquilino. Si queda pagado y con monto,
  * el balance se actualiza con los valores nuevos.
  */
 export async function corregir(input: {
@@ -46,6 +53,7 @@ export async function corregir(input: {
   monto?: string;
   fechaVencimiento?: string;
   fechaPago?: string;
+  responsable?: Responsable;
 }): Promise<
   { antes: NonNullable<Awaited<ReturnType<typeof gastosRepo.obtenerPorId>>>; despues: GastoPropiedad } | undefined
 > {
@@ -56,6 +64,7 @@ export async function corregir(input: {
     monto: input.monto,
     fechaVencimiento: input.fechaVencimiento,
     fechaPago: input.fechaPago,
+    responsable: input.responsable ?? (input.tipo ? responsablePorDefecto(input.tipo) : undefined),
   });
   if (!despues) return undefined;
   await sincronizarMovimiento(despues);

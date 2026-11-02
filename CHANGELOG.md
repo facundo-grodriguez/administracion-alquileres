@@ -2,6 +2,22 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.7.0] — 2026-10-21 — Servicios a cargo del inquilino
+> 🏠 Servicios, expensas e impuestos los paga el inquilino: no se descuentan del alquiler
+> 🔧 En arreglos y "otro" se pregunta quién paga
+> ✏️ Corregir gasto: elegís propiedad, después mes y ahí el gasto
+
+Regla de negocio: luz, gas, agua, internet, expensas, ABL, ARBA y seguro hogar los paga el inquilino, así
+que quedan registrados pero no restan en el balance. En arreglos y "otro" se pregunta quién paga (en
+"💡 Gasto", en "🧾 Varios gastos" por cada uno y en los servicios del "💰 Pago"); solo lo del propietario
+resta. "Corregir gasto" permite cambiar quién paga. Al arrancar, los gastos de servicios ya cargados sin
+responsable pasan al inquilino y salen del balance (`asegurarEsquema`).
+
+"✏️ Modificar → 💡 Gasto" ya no lista todos los gastos juntos: primero se elige la propiedad, después el
+mes (solo los que tienen gastos, con la cantidad; los más viejos se buscan escribiendo MM/AAAA) y recién
+ahí los gastos de ese mes. Motor de flujos: el buscador de un paso "entidad" recibe lo ya contestado y
+puede mostrar más de 8 opciones de entrada (`maxListado`).
+
 ## [9.6.0] — 2026-10-21 — Pago mixto, arreglos como gasto y fix de pregunta repetida
 > 💵 Medio de pago: efectivo + transferencia
 > 🔧 Nuevo tipo de gasto: Arreglo / reparación

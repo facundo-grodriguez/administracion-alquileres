@@ -12,6 +12,7 @@ import * as pagosService from "../../core/services/pagos.service.js";
 import * as vencimientosService from "../../core/services/vencimientos.service.js";
 import { diasEntreISO, formatoFechaAR, formatoPeriodoAR, hoyISO, sumarDiasISO } from "../../core/util/fecha.js";
 import { formatoARS } from "../../core/util/formato.js";
+import { entraEnBalance } from "../../core/util/responsableGasto.js";
 import { tecladoAlquilerActual } from "./flowKeyboards.js";
 import { cobrosDelMesTexto } from "./menuDirecto.js";
 
@@ -93,9 +94,9 @@ async function balance(alcance?: string, periodo?: string): Promise<RespuestaCon
   const resultado = await movimientosService.calcularBalance({ propiedadId, desde, hasta });
 
   // Los gastos cargados pero sin pagar no son movimientos todavía: se avisan aparte para que no
-  // parezca que el balance "perdió" un gasto.
+  // parezca que el balance "perdió" un gasto. Los que paga el inquilino nunca restan: no se avisan.
   const pendientes = (await gastosRepo.listarPendientes()).filter(
-    (g) => (!propiedadId || g.propiedadId === propiedadId) && g.fechaVencimiento <= hasta,
+    (g) => (!propiedadId || g.propiedadId === propiedadId) && g.fechaVencimiento <= hasta && entraEnBalance(g),
   );
   const notaPendientes =
     pendientes.length > 0

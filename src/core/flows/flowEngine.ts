@@ -120,7 +120,10 @@ async function renderDesde(estado: FlowState, registro: RegistroFlujos): Promise
     frame.candidatosPendientes = undefined;
 
     if (paso.campo.tipo === "entidad") {
-      const candidatos = (await paso.campo.buscar("")).slice(0, MAX_CANDIDATOS_LISTADO);
+      const candidatos = (await paso.campo.buscar("", frame.datos)).slice(
+        0,
+        paso.campo.maxListado ?? MAX_CANDIDATOS_LISTADO,
+      );
       frame.candidatosPendientes = candidatos;
       return {
         tipo: "candidatos",
@@ -298,7 +301,10 @@ export async function procesarTexto(
       return siguientePaso(estado, registro);
     }
     case "entidad": {
-      const candidatos = (await paso.campo.buscar(texto.trim())).slice(0, MAX_CANDIDATOS_BUSQUEDA);
+      const candidatos = (await paso.campo.buscar(texto.trim(), frame.datos)).slice(
+        0,
+        Math.max(MAX_CANDIDATOS_BUSQUEDA, paso.campo.maxListado ?? 0),
+      );
       frame.candidatosPendientes = candidatos;
       if (candidatos.length === 1) {
         resolverEntidad(frame, paso, candidatos[0]!);

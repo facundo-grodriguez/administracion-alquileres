@@ -206,7 +206,7 @@ describe("flowEngine — paso entidad: listado inicial de existentes", () => {
 
     await avanzarHastaResponsable(estado, registro);
 
-    expect(buscar).toHaveBeenLastCalledWith("");
+    expect(buscar).toHaveBeenLastCalledWith("", expect.any(Object));
 
     // elegir directo del listado inicial (sin escribir), avanza a confirmación
     const r = await procesarSeleccion(estado, "sel", "1", registro);
@@ -563,5 +563,43 @@ describe("medio de pago mixto en crear_recibo", () => {
     expect(texto).toMatch(/^efectivo .*200\.000 \+ transferencia .*250\.000$/);
     expect(medioPagoTexto({ medio_pago: "omitir" })).toBeUndefined();
     expect(medioPagoTexto({ medio_pago: "efectivo" })).toBe("efectivo");
+  });
+});
+
+describe("paso entidad que depende de lo ya elegido", () => {
+  it("buscar recibe los datos del flujo y respeta maxListado", async () => {
+    const registro = registroCon(async () => []);
+    const vistos: unknown[] = [];
+    registro.corregir_gasto = {
+      id: "corregir_gasto",
+      titulo: "test",
+      etiqueta: () => "x",
+      pasos: [
+        {
+          id: "propiedad_id",
+          pregunta: () => "¿Propiedad?",
+          campo: { tipo: "entidad", buscar: async () => [{ id: "p1", etiqueta: "P1" }] },
+        },
+        {
+          id: "mes",
+          pregunta: () => "¿Mes?",
+          campo: {
+            tipo: "entidad",
+            maxListado: 12,
+            buscar: async (_q, datos) => {
+              vistos.push(datos.propiedad_id);
+              return Array.from({ length: 15 }, (_, i) => ({ id: `m${i}`, etiqueta: `Mes ${i}` }));
+            },
+          },
+        },
+        { id: "__confirmar", pregunta: () => "ok", campo: { tipo: "confirmacion" } },
+      ],
+      ejecutar: async () => "ok",
+    };
+    const estado = crearEstadoFlujo();
+    await iniciarFlujo(estado, "corregir_gasto", {}, registro);
+    const r = await procesarSeleccion(estado, "sel", "0", registro);
+    expect(vistos).toEqual(["p1"]);
+    expect(r.tipo === "candidatos" && r.candidatos.length).toBe(12);
   });
 });

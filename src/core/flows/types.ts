@@ -39,7 +39,10 @@ export type CampoFlujo =
   | { tipo: "opciones"; opciones: OpcionCampo[] }
   | {
       tipo: "entidad";
-      buscar: (query: string) => Promise<CandidatoFlujo[]>;
+      /** `datos` = lo ya contestado en el flujo (ej. para listar solo los gastos de la propiedad elegida). */
+      buscar: (query: string, datos: DatosFlujo) => Promise<CandidatoFlujo[]>;
+      /** Cuántos mostrar de entrada, sin escribir nada (por defecto 8). */
+      maxListado?: number;
       crear?: FlowId;
       /** Datos a precargar en el sub-flujo de alta inline (ej. el rol, para no volver a preguntarlo). */
       datosCrear?: DatosFlujo;

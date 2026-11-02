@@ -45,3 +45,15 @@ export async function upsertPorReferencia(datos: NuevoMovimientoFinanciero): Pro
   }
   return crearMovimiento(datos);
 }
+
+/** Borra el movimiento asociado a un origen (si existe), p. ej. un gasto que pasó a pagarlo el inquilino. */
+export async function eliminarPorReferencia(referenciaTipo: string, referenciaId: string): Promise<void> {
+  await db
+    .delete(movimientosFinancieros)
+    .where(
+      and(
+        eq(movimientosFinancieros.referenciaTipo, referenciaTipo),
+        eq(movimientosFinancieros.referenciaId, referenciaId),
+      ),
+    );
+}

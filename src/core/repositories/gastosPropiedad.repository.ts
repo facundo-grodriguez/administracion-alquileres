@@ -49,7 +49,13 @@ export async function listarRecientes(limite = 30) {
 /** Corrige datos de un gasto ya cargado. */
 export async function actualizarGasto(
   id: string,
-  datos: { tipo?: GastoPropiedad["tipo"]; monto?: string; fechaVencimiento?: string; fechaPago?: string },
+  datos: {
+    tipo?: GastoPropiedad["tipo"];
+    monto?: string;
+    fechaVencimiento?: string;
+    fechaPago?: string;
+    responsable?: GastoPropiedad["responsable"];
+  },
 ): Promise<GastoPropiedad | undefined> {
   const filas = await db
     .update(gastosPropiedad)

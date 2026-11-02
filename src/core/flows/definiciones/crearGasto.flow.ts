@@ -1,6 +1,7 @@
 import { crearGastoTool } from "../../assistant/tools/crearGasto.tool.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
+import { hayQueElegirResponsable, type Responsable, responsablePorDefecto } from "../../util/responsableGasto.js";
 import { buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
 import { type DefinicionFlujo, etiquetaKey } from "../types.js";
 
@@ -17,10 +18,9 @@ export const TIPOS_GASTO = [
   { valor: "otro", etiqueta: "Otro" },
 ];
 
-const RESPONSABLES = [
+export const RESPONSABLES = [
   { valor: "propietario", etiqueta: "👤 Propietario" },
   { valor: "inquilino", etiqueta: "🏠 Inquilino" },
-  { valor: "omitir", etiqueta: "Omitir" },
 ];
 
 export const crearGastoFlow: DefinicionFlujo = {
@@ -42,13 +42,15 @@ export const crearGastoFlow: DefinicionFlujo = {
     { id: "fecha_vencimiento", pregunta: () => "¿Fecha de vencimiento?", campo: { tipo: "fecha" } },
     {
       id: "responsable",
-      pregunta: () => "¿Quién lo paga? (opcional)",
+      pregunta: () => "¿Quién lo paga?",
       campo: { tipo: "opciones", opciones: RESPONSABLES },
+      // Servicios, expensas, impuestos y seguro los paga el inquilino: solo se pregunta en arreglos/otro.
+      saltar: (datos) => !hayQueElegirResponsable(datos.tipo),
     },
     { id: "monto", pregunta: () => "¿Monto? (opcional)", campo: { tipo: "monto", opcional: true } },
     {
       id: "pagado",
-      pregunta: () => "¿Ya está pagado? (si está pagado entra en el balance)",
+      pregunta: () => "¿Ya está pagado?",
       campo: {
         tipo: "opciones",
         opciones: [
@@ -72,7 +74,7 @@ export const crearGastoFlow: DefinicionFlujo = {
           `Propiedad: ${datos[etiquetaKey("propiedad_id")]}`,
           `Tipo: ${datos.tipo}`,
           `Vencimiento: ${formatoFechaAR(datos.fecha_vencimiento as string)}`,
-          datos.responsable && datos.responsable !== "omitir" ? `Responsable de pago: ${datos.responsable}` : null,
+          `Paga: ${datos.responsable ?? responsablePorDefecto(datos.tipo) ?? "propietario"}`,
           datos.monto ? `Monto: ${formatoARS(datos.monto as string)}` : null,
           datos.pagado === "si" ? `Pagado el ${formatoFechaAR(datos.fecha_pago as string)}` : "Pendiente de pago",
         ]
@@ -96,8 +98,7 @@ export const crearGastoFlow: DefinicionFlujo = {
         | "reparacion"
         | "otro",
       fecha_vencimiento: datos.fecha_vencimiento as string,
-      responsable:
-        datos.responsable === "omitir" ? undefined : (datos.responsable as "propietario" | "inquilino" | undefined),
+      responsable: datos.responsable as Responsable | undefined,
       monto: datos.monto as string | undefined,
       fecha_pago: datos.pagado === "si" ? (datos.fecha_pago as string) : undefined,
     }),

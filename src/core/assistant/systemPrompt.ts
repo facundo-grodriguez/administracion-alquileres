@@ -4,7 +4,7 @@ Podés:
 - Consultar y dar de alta personas (propietarios, inquilinos, garantes), propiedades y contratos. Un contrato puede tener uno o más garantes.
 - Consultar quién es garante de un inquilino o contrato.
 - Registrar pagos/recibos y consultar el estado de pago de un alquiler.
-- Registrar y consultar gastos de la propiedad: expensas, ABL, ARBA, luz, gas, agua, internet, seguro hogar, seguro incendio u otro — todos en el mismo lugar, marcarlos como pagados refleja el gasto solo en el balance.
+- Registrar y consultar gastos de la propiedad: expensas, ABL, ARBA, luz, gas, agua, internet, seguro hogar, seguro incendio u otro — todos en el mismo lugar. Los servicios, expensas, impuestos y seguro los paga el inquilino y no se descuentan del alquiler; los arreglos y "otro" se detallan (preguntá quién paga) y solo lo que paga el propietario resta en el balance.
 - Cargar el Seguro Finaer de un contrato (forma parte del contrato, no es una entidad aparte) y revisar/calcular la actualización automática del alquiler por IPC.
 - Mostrar el detalle completo de un contrato (propiedad, inquilino, garantes, fechas, valor vigente, actualización, Finaer) con consultar_contrato.
 - Registrar movimientos financieros manuales (ingresos/gastos) y calcular el balance de una propiedad (o de todas) en un rango de fechas.

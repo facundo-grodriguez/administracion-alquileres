@@ -5,9 +5,10 @@
 import { crearGastoTool } from "../../assistant/tools/crearGasto.tool.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
+import { hayQueElegirResponsable, type Responsable } from "../../util/responsableGasto.js";
 import { buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
 import { type DatosFlujo, type DefinicionFlujo, etiquetaKey, type PasoFlujo } from "../types.js";
-import { TIPOS_GASTO } from "./crearGasto.flow.js";
+import { RESPONSABLES, TIPOS_GASTO } from "./crearGasto.flow.js";
 
 export const MAX_GASTOS_POR_CARGA = 8;
 const FIN = "fin";
@@ -25,7 +26,7 @@ function gastoActivo(datos: DatosFlujo, n: number): boolean {
   return true;
 }
 
-export type GastoCargado = { tipo: TipoGasto; monto?: string; vencimiento?: string };
+export type GastoCargado = { tipo: TipoGasto; monto?: string; vencimiento?: string; responsable?: Responsable };
 
 export function gastosCargados(datos: DatosFlujo): GastoCargado[] {
   const gastos: GastoCargado[] = [];
@@ -36,6 +37,7 @@ export function gastosCargados(datos: DatosFlujo): GastoCargado[] {
       tipo: tipo as TipoGasto,
       monto: datos[`gasto${n}_monto`] as string | undefined,
       vencimiento: datos[`gasto${n}_vencimiento`] as string | undefined,
+      responsable: datos[`gasto${n}_responsable`] as Responsable | undefined,
     });
   }
   return gastos;
@@ -43,7 +45,7 @@ export function gastosCargados(datos: DatosFlujo): GastoCargado[] {
 
 /**
  * Pasos para cargar hasta MAX_GASTOS_POR_CARGA gastos seguidos (tipo → monto → vencimiento, y
- * "¿Otro gasto?"). Los usa "🧾 Varios gastos" y también "💰 Pago" (servicios pagados junto con el
+ * "¿Otro gasto?"). En arreglos y "otro" se pregunta además quién lo paga (el resto lo paga el inquilino). Los usa "🧾 Varios gastos" y también "💰 Pago" (servicios pagados junto con el
  * alquiler). `incluir` decide si se pregunta por gastos; `pedirVencimiento`, si hace falta la fecha
  * de vencimiento (para gastos ya pagados no: queda la de pago).
  */
@@ -62,6 +64,12 @@ export function pasosGastos(opciones: {
         pregunta: () => (n === 1 ? (opciones.primeraPregunta ?? "¿Qué gasto es?") : `¿Otro gasto? (van ${n - 1})`),
         campo: { tipo: "opciones", opciones: tiposOpciones },
         saltar: (d) => !enCarga(d),
+      },
+      {
+        id: `gasto${n}_responsable`,
+        pregunta: (d) => `¿Quién paga ${etiquetaTipo(d[`gasto${n}_tipo`])}?`,
+        campo: { tipo: "opciones", opciones: RESPONSABLES },
+        saltar: (d) => !activo(d) || !hayQueElegirResponsable(d[`gasto${n}_tipo`]),
       },
       {
         id: `gasto${n}_monto`,
@@ -84,24 +92,27 @@ export function resumenGastos(gastos: GastoCargado[]): string[] {
   return [
     ...gastos.map(
       (g) =>
-        `• ${etiquetaTipo(g.tipo)}: ${formatoARS(g.monto)}${g.vencimiento ? ` (vence ${formatoFechaAR(g.vencimiento)})` : ""}`,
+        `• ${etiquetaTipo(g.tipo)}: ${formatoARS(g.monto)}${g.vencimiento ? ` (vence ${formatoFechaAR(g.vencimiento)})` : ""}${g.responsable ? ` — paga ${g.responsable}` : ""}`,
     ),
     `Total gastos: ${formatoARS(total)}`,
   ];
 }
 
-/** Crea cada gasto como registro independiente (pagado si viene fechaPago). Devuelve el total. */
+/**
+ * Crea cada gasto como registro independiente (pagado si viene fechaPago). Devuelve el total. Sin
+ * responsable elegido, crear_gasto asume el inquilino para servicios/expensas/impuestos/seguro.
+ */
 export async function crearGastos(
   propiedadId: string,
   gastos: GastoCargado[],
-  opciones: { fechaPago?: string; responsable?: "propietario" | "inquilino" },
+  opciones: { fechaPago?: string },
 ): Promise<number> {
   for (const g of gastos) {
     await crearGastoTool.run({
       propiedad_id: propiedadId,
       tipo: g.tipo,
       fecha_vencimiento: (opciones.fechaPago ?? g.vencimiento) as string,
-      responsable: opciones.responsable,
+      responsable: g.responsable,
       monto: g.monto,
       fecha_pago: opciones.fechaPago,
     });
@@ -136,18 +147,6 @@ export const cargarGastosFlow: DefinicionFlujo = {
       campo: { tipo: "fecha", permitirHoy: true },
       saltar: (d) => d.pagados !== "si",
     },
-    {
-      id: "responsable",
-      pregunta: () => "¿Quién los paga? (opcional)",
-      campo: {
-        tipo: "opciones",
-        opciones: [
-          { valor: "propietario", etiqueta: "👤 Propietario" },
-          { valor: "inquilino", etiqueta: "🏠 Inquilino" },
-          { valor: "omitir", etiqueta: "Omitir" },
-        ],
-      },
-    },
     ...pasosGastos({ incluir: () => true, pedirVencimiento: (d) => d.pagados !== "si" }),
     {
       id: "__confirmar",
@@ -168,14 +167,12 @@ export const cargarGastosFlow: DefinicionFlujo = {
     const pagados = datos.pagados === "si";
     const total = await crearGastos(datos.propiedad_id as string, gastos, {
       fechaPago: pagados ? (datos.fecha_pago as string) : undefined,
-      responsable:
-        datos.responsable === "omitir" ? undefined : (datos.responsable as "propietario" | "inquilino" | undefined),
     });
     return [
       `✅ Cargué ${gastos.length} gasto(s) de ${datos[etiquetaKey("propiedad_id")]} por ${formatoARS(total)}.`,
       pagados
-        ? "Quedaron pagados y ya figuran en el balance."
-        : "Quedaron pendientes: entran al balance cuando los pagues.",
+        ? "Quedaron pagados. Los que paga el inquilino no se descuentan del alquiler."
+        : "Quedaron pendientes de pago.",
     ].join("\n");
   },
   botonesPostAccion: "post_gasto",
