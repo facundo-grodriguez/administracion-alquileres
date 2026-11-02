@@ -159,21 +159,22 @@ describe("renderResultado", () => {
 });
 
 describe("tecladoModificar", () => {
-  it("ofrece corregir propiedad, pago, gasto y alquiler actual", () => {
+  it("ofrece corregir propiedad, pago, gasto, alquiler actual y vencimiento de servicio", () => {
     expect(botones(tecladoModificar())).toEqual([
       "flujo:iniciar:editar_propiedad",
       "flujo:iniciar:crear_recibo",
       "flujo:iniciar:corregir_gasto",
       "flujo:iniciar:registrar_alquiler_actual",
+      "flujo:iniciar:editar_vencimiento_servicio",
     ]);
   });
 });
 
 describe("tecladoNuevaCarga", () => {
-  it("ofrece los 9 flujos de alta como accesos directos", () => {
+  it("ofrece los 11 flujos de alta como accesos directos", () => {
     const teclado = tecladoNuevaCarga();
     const datos = botones(teclado);
-    expect(datos).toHaveLength(9);
+    expect(datos).toHaveLength(11);
     expect(datos).toEqual(
       expect.arrayContaining([
         "flujo:iniciar:crear_persona",
@@ -185,6 +186,8 @@ describe("tecladoNuevaCarga", () => {
         "flujo:iniciar:cargar_pagos_anteriores",
         "flujo:iniciar:pagar_gasto",
         "flujo:iniciar:cargar_gastos",
+        "flujo:iniciar:crear_vencimiento_servicio",
+        "flujo:iniciar:pagar_servicio",
       ]),
     );
   });

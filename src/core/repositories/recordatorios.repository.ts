@@ -33,3 +33,25 @@ export async function yaRegistradoAlgunaVez(tipo: string): Promise<boolean> {
   const fila = await db.query.recordatorios.findFirst({ where: eq(recordatorios.tipo, tipo) });
   return fila !== undefined;
 }
+
+/** ¿Ya se mandó este aviso para esta cosa puntual (ej. el aviso previo del servicio X que vence tal día)? */
+export async function yaAvisado(tipo: string, entidadId: string, fechaEvento: string): Promise<boolean> {
+  const fila = await db.query.recordatorios.findFirst({
+    where: and(
+      eq(recordatorios.tipo, tipo),
+      eq(recordatorios.entidadId, entidadId),
+      eq(recordatorios.fechaEvento, fechaEvento),
+    ),
+  });
+  return fila !== undefined;
+}
+
+export async function registrarAviso(
+  tipo: string,
+  entidadTipo: string,
+  entidadId: string,
+  fechaEvento: string,
+  mensaje?: string,
+): Promise<void> {
+  await db.insert(recordatorios).values({ tipo, entidadTipo, entidadId, fechaEvento, estado: "notificado", mensaje });
+}

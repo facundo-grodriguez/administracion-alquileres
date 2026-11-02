@@ -17,7 +17,10 @@ export type FlowId =
   | "pagar_gasto"
   | "corregir_gasto"
   | "editar_propiedad"
-  | "cargar_gastos";
+  | "cargar_gastos"
+  | "crear_vencimiento_servicio"
+  | "pagar_servicio"
+  | "editar_vencimiento_servicio";
 
 export type DatosFlujo = Record<string, unknown>;
 

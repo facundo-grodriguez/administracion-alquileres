@@ -43,6 +43,13 @@
       "when": 1792604074903,
       "tag": "0005_gasto_reparacion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793637203679,
+      "tag": "0006_servicios_vencimiento",
+      "breakpoints": true
     }
   ]
 }

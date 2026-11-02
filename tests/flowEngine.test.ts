@@ -118,6 +118,9 @@ function registroCon(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>
     corregir_gasto: flujoDummy("corregir_gasto"),
     editar_propiedad: flujoDummy("editar_propiedad"),
     cargar_gastos: flujoDummy("cargar_gastos"),
+    crear_vencimiento_servicio: flujoDummy("crear_vencimiento_servicio"),
+    pagar_servicio: flujoDummy("pagar_servicio"),
+    editar_vencimiento_servicio: flujoDummy("editar_vencimiento_servicio"),
   };
 }
 

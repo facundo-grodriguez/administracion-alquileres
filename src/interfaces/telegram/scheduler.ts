@@ -8,6 +8,7 @@ import {
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
 import { hoyISO } from "../../core/util/fecha.js";
+import { enviarAvisosServicios } from "./avisosServicios.js";
 import { TEXTO_AYUDA_ALQUILER_ACTUAL, tecladoAlquilerActual } from "./flowKeyboards.js";
 import { dividirMensaje } from "./util.js";
 
@@ -51,13 +52,27 @@ export async function enviarDigestDiario(bot: Bot, destinos: number[], opciones?
   }
 }
 
-/** Programa el recordatorio diario a la hora configurada (AGENDA_HORA, AGENDA_TIMEZONE). */
+/**
+ * Programa el recordatorio diario a la hora configurada (AGENDA_HORA, AGENDA_TIMEZONE): primero la
+ * agenda y después un mensaje por cada servicio que vence en 3 días o hoy (con botones).
+ */
 export function iniciarSchedulerAgenda(bot: Bot, destinos: number[]): void {
   const partes = env.AGENDA_HORA.split(":");
   const hora = Number(partes[0]);
   const minuto = Number(partes[1]);
   const expresionCron = `${minuto} ${hora} * * *`; // todos los días a esa hora
 
-  schedule(expresionCron, () => enviarDigestDiario(bot, destinos), { timezone: env.AGENDA_TIMEZONE });
+  schedule(
+    expresionCron,
+    async () => {
+      await enviarDigestDiario(bot, destinos).catch((error: unknown) =>
+        console.error("Falló la agenda diaria:", error),
+      );
+      await enviarAvisosServicios(bot, destinos).catch((error: unknown) =>
+        console.error("Fallaron los avisos de servicios:", error),
+      );
+    },
+    { timezone: env.AGENDA_TIMEZONE },
+  );
   console.log(`Recordatorio diario programado a las ${env.AGENDA_HORA} (${env.AGENDA_TIMEZONE}).`);
 }

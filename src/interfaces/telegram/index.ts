@@ -21,6 +21,7 @@ import {
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
 import { esCallbackAccion, resolverAccion } from "./acciones.js";
+import { enviarAvisosServicios, esCallbackServicio, resolverCallbackServicio } from "./avisosServicios.js";
 import { avisarVersionNueva } from "./avisoVersion.js";
 import { esCallbackConsulta, responderConsulta, tecladoConsultas } from "./consultas.js";
 import {
@@ -89,6 +90,7 @@ const AYUDA = [
   "• ¿Está pago el alquiler de Juan?",
   "• ¿Corresponde actualizar el alquiler de Juan?",
   "• Cargá un gasto de expensas para [propiedad] que vence el 30/08",
+  "• La luz de casa vence el 15 de cada mes (te aviso 3 días antes y ese día)",
   "",
   "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores. Para corregir algo ya cargado (propiedad, pago, gasto), usá ✏️ Modificar.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
@@ -198,11 +200,13 @@ bot.command("agenda", async (ctx) => {
   }
 });
 
-// Dispara el recordatorio diario en el momento (hacia quien lo pide), para probar el push.
+// Dispara el recordatorio diario en el momento (hacia quien lo pide), para probar el push: la agenda
+// y los avisos de servicios que tocarían (sin marcarlos como enviados).
 bot.command("enviar_agenda", async (ctx) => {
   await ctx.replyWithChatAction("typing");
   try {
     await enviarDigestDiario(bot, [ctx.chat.id], { forzar: true });
+    await enviarAvisosServicios(bot, [ctx.chat.id], { forzar: true });
   } catch (error) {
     console.error("Error al enviar el recordatorio:", error);
     await ctx.reply("No pude enviar el recordatorio.");
@@ -322,6 +326,24 @@ bot.on("callback_query:data", async (ctx) => {
     } catch (error) {
       console.error("Error procesando la consulta:", error);
       await ctx.reply("No pude hacer la consulta. Revisá la conexión a la base de datos.");
+    }
+    return;
+  }
+
+  // Botones de los avisos de vencimiento de servicios ("✅ Ya lo pagué", "📅 Cambió la fecha"): sin OpenAI.
+  if (esCallbackServicio(datos)) {
+    try {
+      const resultado = await resolverCallbackServicio(datos);
+      if (resultado.tipo === "flujo") {
+        const estadoFlujo = estadoFlujoDe(chatId);
+        cancelarFlujo(estadoFlujo);
+        await responderFlujo(ctx, await iniciarFlujo(estadoFlujo, resultado.flowId, resultado.datos));
+        return;
+      }
+      await ctx.reply(resultado.texto, { reply_markup: menuPrincipalKeyboard });
+    } catch (error) {
+      console.error("Error procesando el aviso de servicio:", error);
+      await ctx.reply("Uf, ocurrió un error procesando tu pedido. Probá de nuevo en un momento.");
     }
     return;
   }

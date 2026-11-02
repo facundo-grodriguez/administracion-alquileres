@@ -2,6 +2,19 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.8.0] — 2026-11-02 — Vencimientos de servicios
+> 📅 Agendá vencimientos de servicios (luz, gas, celular, prepaga...), tuyos o de una propiedad
+> ⏰ El bot te avisa 3 días antes y el mismo día, con botones "Ya lo pagué" y "Cambió la fecha"
+> 🔎 Consultas → 📅 Servicios del mes: qué vence, qué está pago y cuánto falta
+
+Se cargan una vez con el día fijo del mes (➕ Nueva carga → 📅 Vencimiento, o escribiendo "la luz vence el
+15") y se repiten solos todos los meses. Si una factura vence otro día, se cambia solo para ese mes (desde
+el aviso o en ✏️ Modificar → 📅 Vencimiento), y ahí también se cambia el día fijo, el monto o se da de baja.
+Los avisos llegan junto con la agenda diaria, no se repiten y dejan de llegar al marcarlo pagado; si el bot
+estuvo caído el día del vencimiento, avisa igual hasta 2 días después. También aparecen en la agenda y en
+"Vencimientos (30 días)". Son recordatorios: no son gastos de propiedad ni tocan el balance. Tablas nuevas
+`servicios_vencimiento` y `servicios_vencimiento_mes` (migración 0006, que el bot aplica solo al arrancar).
+
 ## [9.7.0] — 2026-10-21 — Servicios a cargo del inquilino
 > 🏠 Servicios, expensas e impuestos los paga el inquilino: no se descuentan del alquiler
 > 🔧 En arreglos y "otro" se pregunta quién paga

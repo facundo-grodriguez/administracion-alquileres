@@ -1,9 +1,11 @@
 import * as contratosRepo from "../repositories/contratos.repository.js";
 import * as gastosRepo from "../repositories/gastosPropiedad.repository.js";
 import { diasEntreISO, hoyISO, sumarDiasISO } from "../util/fecha.js";
+import { iconoServicio } from "../util/vencimientoServicio.js";
 import * as actualizacionAlquilerService from "./actualizacionAlquiler.service.js";
+import * as serviciosService from "./serviciosVencimiento.service.js";
 
-export type TipoVencimiento = "contrato" | "gasto" | "finaer" | "actualizacion_alquiler";
+export type TipoVencimiento = "contrato" | "gasto" | "finaer" | "actualizacion_alquiler" | "servicio";
 
 export type ItemVencimiento = {
   tipo: TipoVencimiento;
@@ -17,7 +19,8 @@ export type ItemVencimiento = {
 
 /**
  * Vencimientos dentro de un rango de fechas, unificando contratos (fin de contrato), gastos de
- * propiedad, Seguro Finaer y contratos con actualización de alquiler pendiente. Si no se pasan
+ * propiedad, Seguro Finaer, contratos con actualización de alquiler pendiente y vencimientos de
+ * servicios sin pagar (los de este mes ya vencidos también, como atrasados). Si no se pasan
  * fechas, usa un horizonte de 30 días desde hoy. `tipo` filtra a un solo tipo; si se omite,
  * devuelve todos, ordenados por fecha.
  */
@@ -95,6 +98,22 @@ export async function listarVencimientos(
         fechaVencimiento: proximaFecha,
         diasRestantes: diasEntreISO(hoy, proximaFecha),
         monto: null,
+      });
+    }
+  }
+
+  if (!tipo || tipo === "servicio") {
+    for (const v of await serviciosService.sinPagarHasta(hastaISO, hoy)) {
+      // Desde hoy se incluyen los atrasados de este mes; con otra fecha de inicio, solo lo que cae en el rango.
+      if (desdeISO !== hoy && v.fechaVencimiento < desdeISO) continue;
+      items.push({
+        tipo: "servicio",
+        entidadId: v.servicioId,
+        propiedad: v.propiedad ?? "Personal",
+        descripcion: `${iconoServicio(v.nombre)} ${v.nombre}`,
+        fechaVencimiento: v.fechaVencimiento,
+        diasRestantes: v.diasRestantes,
+        monto: v.monto,
       });
     }
   }

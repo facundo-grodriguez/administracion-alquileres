@@ -225,6 +225,38 @@ export const gastosPropiedad = pgTable(
   (t) => [index("gastos_propiedad_fecha_vencimiento_idx").on(t.fechaVencimiento)],
 );
 
+/**
+ * Vencimientos de servicios (v9.8.0): luz, gas, celular, prepaga... que vencen todos los meses el
+ * mismo día. Son un recordatorio del administrador: no son gastos ni tocan el balance.
+ * Sin propiedad = servicio personal.
+ */
+export const serviciosVencimiento = pgTable("servicios_vencimiento", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  nombre: varchar("nombre", { length: 80 }).notNull(),
+  propiedadId: uuid("propiedad_id").references(() => propiedades.id, { onDelete: "cascade" }),
+  diaVencimiento: integer("dia_vencimiento").notNull(),
+  monto: numeric("monto", { precision: 12, scale: 2 }),
+  activo: boolean("activo").notNull().default(true),
+  ...timestamps,
+});
+
+/** Lo que cambia mes a mes de un servicio: otra fecha de vencimiento ese mes y/o el pago. */
+export const serviciosVencimientoMes = pgTable(
+  "servicios_vencimiento_mes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    servicioId: uuid("servicio_id")
+      .notNull()
+      .references(() => serviciosVencimiento.id, { onDelete: "cascade" }),
+    periodo: varchar("periodo", { length: 7 }).notNull(),
+    fechaVencimiento: date("fecha_vencimiento"),
+    fechaPago: date("fecha_pago"),
+    monto: numeric("monto", { precision: 12, scale: 2 }),
+    ...timestamps,
+  },
+  (t) => [unique("servicios_vencimiento_mes_servicio_periodo_uq").on(t.servicioId, t.periodo)],
+);
+
 export const reparaciones = pgTable("reparaciones", {
   id: uuid("id").defaultRandom().primaryKey(),
   propiedadId: uuid("propiedad_id")
@@ -326,4 +358,16 @@ export const reparacionesRelations = relations(reparaciones, ({ one }) => ({
 
 export const movimientosFinancierosRelations = relations(movimientosFinancieros, ({ one }) => ({
   propiedad: one(propiedades, { fields: [movimientosFinancieros.propiedadId], references: [propiedades.id] }),
+}));
+
+export const serviciosVencimientoRelations = relations(serviciosVencimiento, ({ one, many }) => ({
+  propiedad: one(propiedades, { fields: [serviciosVencimiento.propiedadId], references: [propiedades.id] }),
+  meses: many(serviciosVencimientoMes),
+}));
+
+export const serviciosVencimientoMesRelations = relations(serviciosVencimientoMes, ({ one }) => ({
+  servicio: one(serviciosVencimiento, {
+    fields: [serviciosVencimientoMes.servicioId],
+    references: [serviciosVencimiento.id],
+  }),
 }));

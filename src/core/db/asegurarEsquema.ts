@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { sql } from "drizzle-orm";
 import { db } from "./client.js";
 
@@ -26,7 +27,27 @@ const CAMBIOS: { descripcion: string; sentencia: ReturnType<typeof sql> }[] = [
   },
 ];
 
+/**
+ * Migraciones de `drizzle/` escritas para poder correrse varias veces (CREATE ... IF NOT EXISTS):
+ * el bot las aplica solo al arrancar, leyendo el mismo archivo — así no se duplica el SQL acá.
+ */
+const MIGRACIONES_AL_ARRANCAR = ["0006_servicios_vencimiento.sql"];
+
+async function aplicarMigracion(archivo: string): Promise<void> {
+  const texto = await readFile(new URL(`../../../drizzle/${archivo}`, import.meta.url), "utf8");
+  for (const sentencia of texto.split("--> statement-breakpoint")) {
+    if (sentencia.trim()) await db.execute(sql.raw(sentencia));
+  }
+}
+
 export async function asegurarEsquema(): Promise<void> {
+  for (const archivo of MIGRACIONES_AL_ARRANCAR) {
+    try {
+      await aplicarMigracion(archivo);
+    } catch (error) {
+      console.error(`No pude aplicar la migración ${archivo}:`, error instanceof Error ? error.message : error);
+    }
+  }
   for (const cambio of CAMBIOS) {
     try {
       await db.execute(cambio.sentencia);

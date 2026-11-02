@@ -9,10 +9,12 @@ import * as gastosRepo from "../../core/repositories/gastosPropiedad.repository.
 import * as propiedadesRepo from "../../core/repositories/propiedades.repository.js";
 import * as movimientosService from "../../core/services/movimientos.service.js";
 import * as pagosService from "../../core/services/pagos.service.js";
+import * as serviciosService from "../../core/services/serviciosVencimiento.service.js";
 import * as vencimientosService from "../../core/services/vencimientos.service.js";
 import { diasEntreISO, formatoFechaAR, formatoPeriodoAR, hoyISO, sumarDiasISO } from "../../core/util/fecha.js";
 import { formatoARS } from "../../core/util/formato.js";
 import { entraEnBalance } from "../../core/util/responsableGasto.js";
+import { periodoSiguiente } from "../../core/util/vencimientoServicio.js";
 import { tecladoAlquilerActual } from "./flowKeyboards.js";
 import { cobrosDelMesTexto } from "./menuDirecto.js";
 
@@ -30,6 +32,7 @@ export const OPCIONES_CONSULTA: OpcionConsulta[] = [
   { op: "gastos", texto: "💡 Gastos sin pagar" },
   { op: "gar", texto: "🛡️ Garantes", porContrato: true },
   { op: "bal", texto: "💵 Balance" },
+  { op: "serv", texto: "📅 Servicios del mes" },
 ];
 
 export type RespuestaConsulta = { texto: string; teclado?: InlineKeyboard };
@@ -178,6 +181,22 @@ async function gastosPendientesTexto(): Promise<string> {
   return `💡 Gastos sin pagar (${gastos.length}):\n\n${lineas.join("\n")}`;
 }
 
+// Servicios: "cq:serv" muestra el mes actual y "cq:serv:<YYYY-MM>" otro mes.
+async function serviciosDelMes(periodo?: string): Promise<RespuestaConsulta> {
+  const hoy = hoyISO();
+  const p = periodo && /^\d{4}-\d{2}$/.test(periodo) ? periodo : hoy.slice(0, 7);
+  const items = await serviciosService.delMes(p, hoy);
+  const teclado = new InlineKeyboard();
+  if (items.some((v) => !v.fechaPago)) teclado.text("✅ Pagar servicio", "flujo:iniciar:pagar_servicio");
+  teclado.text("➕ Agregar", "flujo:iniciar:crear_vencimiento_servicio").row();
+  if (items.length > 0) {
+    const siguiente = periodoSiguiente(p);
+    teclado.text(`➡️ ${formatoPeriodoAR(siguiente)}`, `${PREFIJO}serv:${siguiente}`);
+    teclado.text("✏️ Cambiar uno", "flujo:iniciar:editar_vencimiento_servicio");
+  }
+  return { texto: serviciosService.textoDelMes(items, p, hoy), teclado: botonOtraConsulta(teclado) };
+}
+
 async function porContrato(op: string, contratoId: string): Promise<RespuestaConsulta> {
   const contrato = await contratosRepo.buscarContratoPorId(contratoId);
   if (!contrato) return { texto: "No encontré ese contrato.", teclado: botonOtraConsulta() };
@@ -210,6 +229,7 @@ async function porContrato(op: string, contratoId: string): Promise<RespuestaCon
 export async function responderConsulta(datos: string): Promise<RespuestaConsulta> {
   const { op, contratoId, extra } = parseCallbackConsulta(datos);
   if (op === "bal") return balance(contratoId, extra);
+  if (op === "serv") return serviciosDelMes(contratoId);
   if (contratoId) return porContrato(op, contratoId);
 
   const opcion = OPCIONES_CONSULTA.find((o) => o.op === op);
