@@ -31,7 +31,7 @@ const CAMBIOS: { descripcion: string; sentencia: ReturnType<typeof sql> }[] = [
  * Migraciones de `drizzle/` escritas para poder correrse varias veces (CREATE ... IF NOT EXISTS):
  * el bot las aplica solo al arrancar, leyendo el mismo archivo — así no se duplica el SQL acá.
  */
-const MIGRACIONES_AL_ARRANCAR = ["0006_servicios_vencimiento.sql"];
+const MIGRACIONES_AL_ARRANCAR = ["0006_servicios_vencimiento.sql", "0007_servicio_mes_gasto.sql"];
 
 async function aplicarMigracion(archivo: string): Promise<void> {
   const texto = await readFile(new URL(`../../../drizzle/${archivo}`, import.meta.url), "utf8");

@@ -86,18 +86,44 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
     }),
 };
 
-// El id de cada candidato a pagar lleva el servicio y el mes: "<servicioId>|<YYYY-MM>".
+// El id de cada candidato a pagar lleva lo que los pasos siguientes necesitan saber sin ir a la base:
+// "<servicioId>|<YYYY-MM>|<p si es de una propiedad>|<a si está alquilada>|<monto aprox.>".
 const SEP = "|";
+
+type VencimientoServicio = serviciosService.VencimientoServicio;
+
+export async function idPagoServicio(v: VencimientoServicio): Promise<string> {
+  const alquilada = await serviciosService.propiedadAlquilada(v.propiedadId);
+  return [v.servicioId, v.periodo, v.propiedadId ? "p" : "", alquilada ? "a" : "", v.monto ?? ""].join(SEP);
+}
+
+export function etiquetaPagoServicio(v: VencimientoServicio): string {
+  return `🕓 ${nombreServicio(v.nombre, v.propiedad)} — ${formatoFechaAR(v.fechaVencimiento)}${v.monto ? ` — ${formatoARS(v.monto)}` : ""}`;
+}
+
+export function infoPagoServicio(datos: DatosFlujo) {
+  const [servicioId = "", periodo, propiedad, alquilada, monto] = String(datos.vencimiento ?? "").split(SEP);
+  return {
+    servicioId,
+    periodo: periodo || undefined,
+    esPropiedad: propiedad === "p",
+    alquilada: alquilada === "a",
+    montoAprox: monto || undefined,
+  };
+}
+
+/** Monto final del pago: el aproximado si se confirmó, o el que se escribió. */
+function montoPagado(datos: DatosFlujo): string | undefined {
+  if (datos.usar_aprox === "si") return infoPagoServicio(datos).montoAprox;
+  return (datos.monto_real ?? datos.monto ?? undefined) as string | undefined;
+}
 
 async function buscarParaPagar(query: string): Promise<CandidatoFlujo[]> {
   const items = await serviciosService.paraPagar();
-  return filtrar(
-    items.map((v) => ({
-      id: `${v.servicioId}${SEP}${v.periodo}`,
-      etiqueta: `🕓 ${nombreServicio(v.nombre, v.propiedad)} — ${formatoFechaAR(v.fechaVencimiento)}${v.monto ? ` — ${formatoARS(v.monto)}` : ""}`,
-    })),
-    query,
+  const candidatos = await Promise.all(
+    items.map(async (v) => ({ id: await idPagoServicio(v), etiqueta: etiquetaPagoServicio(v) })),
   );
+  return filtrar(candidatos, query);
 }
 
 export const pagarServicioFlow: DefinicionFlujo = {
@@ -112,32 +138,76 @@ export const pagarServicioFlow: DefinicionFlujo = {
     },
     { id: "fecha_pago", pregunta: () => "¿Cuándo lo pagaste?", campo: { tipo: "fecha", permitirHoy: true } },
     {
+      id: "usar_aprox",
+      pregunta: (datos) => `¿Pagaste ${formatoARS(infoPagoServicio(datos).montoAprox!)}?`,
+      campo: {
+        tipo: "opciones",
+        opciones: [
+          { valor: "si", etiqueta: "✅ Sí, ese monto" },
+          { valor: "no", etiqueta: "✏️ Otro monto" },
+        ],
+      },
+      saltar: (datos) => !infoPagoServicio(datos).montoAprox,
+    },
+    {
+      // Servicio personal: el monto es opcional (es solo para el registro).
       id: "monto",
-      pregunta: () => "¿Cuánto pagaste? Si es lo de siempre, tocá Omitir.",
+      pregunta: () => "¿Cuánto pagaste? Si no lo sabés, tocá Omitir.",
       campo: { tipo: "monto", opcional: true },
+      saltar: (datos) => infoPagoServicio(datos).esPropiedad || datos.usar_aprox === "si",
+    },
+    {
+      // Servicio de una propiedad: se carga como gasto, así que hace falta el monto real.
+      id: "monto_real",
+      pregunta: () => "¿Cuánto pagaste? Escribí el monto (ej. 45000). Se carga como gasto de la propiedad.",
+      campo: { tipo: "monto" },
+      saltar: (datos) => !infoPagoServicio(datos).esPropiedad || datos.usar_aprox === "si",
+    },
+    {
+      id: "responsable",
+      pregunta: () => "La propiedad está alquilada: ¿quién lo pagó?",
+      campo: {
+        tipo: "opciones",
+        opciones: [
+          { valor: "propietario", etiqueta: "🏠 El propietario (resta del balance)" },
+          { valor: "inquilino", etiqueta: "👤 El inquilino (no resta)" },
+        ],
+      },
+      saltar: (datos) => !infoPagoServicio(datos).alquilada,
     },
     {
       id: "__confirmar",
-      pregunta: (datos) =>
-        [
+      pregunta: (datos) => {
+        const info = infoPagoServicio(datos);
+        const monto = montoPagado(datos);
+        return [
           "Confirmá el pago:",
           "",
-          String(datos[etiquetaKey("vencimiento")]).replace(/^🕓 /, ""),
+          String(datos[etiquetaKey("vencimiento")])
+            .replace(/^🕓 /, "")
+            .replace(/ — \$[^—]*$/, ""), // sin el monto aprox.
           `Pagado el ${formatoFechaAR(datos.fecha_pago as string)}`,
-          datos.monto ? `Monto: ${formatoARS(datos.monto as string)}` : null,
+          monto ? `Monto: ${formatoARS(monto)}` : null,
+          info.esPropiedad
+            ? datos.responsable === "inquilino"
+              ? "Se carga como gasto de la propiedad pagado por el inquilino (no resta del balance)."
+              : "Se carga como gasto de la propiedad y resta del balance."
+            : null,
         ]
           .filter((l) => l !== null)
-          .join("\n"),
+          .join("\n");
+      },
       campo: { tipo: "confirmacion" },
     },
   ],
   ejecutar: (datos) => {
-    const [servicioId, periodo] = String(datos.vencimiento).split(SEP);
+    const info = infoPagoServicio(datos);
     return marcarServicioPagadoTool.run({
-      servicio_id: servicioId!,
-      periodo,
+      servicio_id: info.servicioId,
+      periodo: info.periodo,
       fecha_pago: datos.fecha_pago as string,
-      monto: datos.monto as string | undefined,
+      monto: montoPagado(datos),
+      responsable: datos.responsable as "propietario" | "inquilino" | undefined,
     });
   },
 };

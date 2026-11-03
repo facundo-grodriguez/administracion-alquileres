@@ -1,9 +1,13 @@
 // Vencimientos de servicios (v9.8.0): qué vence cada mes, qué falta pagar y qué aviso toca hoy.
-// Son recordatorios del administrador: no son gastos de propiedad ni tocan el balance.
+// Son recordatorios del administrador. Los personales no tocan el balance; los de una propiedad, al
+// pagarlos, se cargan también como gasto de esa propiedad (v9.9.0).
+import * as contratosRepo from "../repositories/contratos.repository.js";
+import * as gastosRepo from "../repositories/gastosPropiedad.repository.js";
 import * as recordatoriosRepo from "../repositories/recordatorios.repository.js";
 import * as serviciosRepo from "../repositories/serviciosVencimiento.repository.js";
 import { diasEntreISO, formatoFechaAR, formatoPeriodoAR, hoyISO, periodosEntre, sumarDiasISO } from "../util/fecha.js";
 import { formatoARS } from "../util/formato.js";
+import type { Responsable } from "../util/responsableGasto.js";
 import {
   avisoQueCorresponde,
   cuandoVence,
@@ -11,8 +15,10 @@ import {
   periodoPendiente,
   periodoSiguiente,
   type TipoAviso,
+  tipoGastoDeServicio,
   vencimientoDelMes,
 } from "../util/vencimientoServicio.js";
+import * as gastosService from "./gastosPropiedad.service.js";
 
 type ServicioConDetalle = NonNullable<Awaited<ReturnType<typeof serviciosRepo.obtenerPorId>>>;
 
@@ -21,11 +27,14 @@ export type VencimientoServicio = {
   nombre: string;
   /** Dirección de la propiedad, o null si es personal. */
   propiedad: string | null;
+  propiedadId: string | null;
   diaVencimiento: number;
   periodo: string;
   fechaVencimiento: string;
   fechaPago: string | null;
   monto: string | null;
+  /** Gasto de la propiedad cargado al pagarlo (solo servicios de una propiedad). */
+  gastoId: string | null;
   diasRestantes: number;
 };
 
@@ -36,11 +45,13 @@ function armar(servicio: ServicioConDetalle, periodo: string, hoy: string): Venc
     servicioId: servicio.id,
     nombre: servicio.nombre,
     propiedad: servicio.propiedad?.direccion ?? null,
+    propiedadId: servicio.propiedadId,
     diaVencimiento: servicio.diaVencimiento,
     periodo,
     fechaVencimiento,
     fechaPago: mes?.fechaPago ?? null,
     monto: mes?.monto ?? servicio.monto,
+    gastoId: mes?.gastoId ?? null,
     diasRestantes: diasEntreISO(hoy, fechaVencimiento),
   };
 }
@@ -130,9 +141,56 @@ export async function crear(datos: {
   return (await obtener(creado.id))!;
 }
 
-export async function marcarPagado(servicioId: string, periodo: string, fechaPago: string, monto?: string) {
+/** true si la propiedad tiene un contrato vigente (hay inquilino que podría haberlo pagado). */
+export async function propiedadAlquilada(propiedadId: string | null): Promise<boolean> {
+  if (!propiedadId) return false;
+  return Boolean(await contratosRepo.buscarContratoVigentePorPropiedad(propiedadId));
+}
+
+/**
+ * Quién pagó un servicio de propiedad si no se dijo: si la propiedad no está alquilada, el propietario
+ * (resta del balance); si está alquilada y no se eligió, también el propietario (el que lo paga desde
+ * el bot es el administrador). El flujo pregunta cuando hay inquilino.
+ */
+export function responsableDelPago(elegido?: Responsable): Responsable {
+  return elegido ?? "propietario";
+}
+
+/**
+ * Carga (o corrige, si ya estaba) el gasto de la propiedad que corresponde a un servicio pagado.
+ * Devuelve el gasto, o undefined si el servicio es personal.
+ */
+async function sincronizarGasto(v: VencimientoServicio, responsable: Responsable) {
+  if (!v.propiedadId || !v.fechaPago) return undefined;
+  const monto = v.monto ?? undefined;
+  if (v.gastoId && (await gastosRepo.obtenerPorId(v.gastoId))) {
+    return (await gastosService.corregir({ gastoId: v.gastoId, monto, fechaPago: v.fechaPago, responsable }))?.despues;
+  }
+  const gasto = await gastosRepo.crearGasto({
+    propiedadId: v.propiedadId,
+    tipo: tipoGastoDeServicio(v.nombre),
+    responsable,
+    monto,
+    periodicidad: "mensual",
+    fechaVencimiento: v.fechaVencimiento,
+    observaciones: `${v.nombre} de ${formatoPeriodoAR(v.periodo)} (vencimiento de servicio)`,
+  });
+  await serviciosRepo.guardarMes(v.servicioId, v.periodo, { gastoId: gasto.id });
+  return gastosService.marcarPagado({ gastoId: gasto.id, fechaPago: v.fechaPago, monto });
+}
+
+export async function marcarPagado(
+  servicioId: string,
+  periodo: string,
+  fechaPago: string,
+  monto?: string,
+  responsable?: Responsable,
+) {
   await serviciosRepo.guardarMes(servicioId, periodo, { fechaPago, ...(monto ? { monto } : {}) });
-  return obtener(servicioId, periodo);
+  const v = await obtener(servicioId, periodo);
+  if (!v) return undefined;
+  const gasto = await sincronizarGasto(v, responsableDelPago(responsable));
+  return { ...v, gastoId: gasto?.id ?? v.gastoId, gasto };
 }
 
 export async function cambiarFechaDelMes(servicioId: string, periodo: string, fecha: string) {

@@ -22,6 +22,22 @@ export const SERVICIOS = [
   { valor: "otro", etiqueta: "📌 Otro" },
 ];
 
+/** Rubro del gasto de propiedad que corresponde a un servicio ("Luz" → luz, "Seguro" → seguro_hogar). */
+const TIPO_GASTO: Record<string, "luz" | "gas" | "agua" | "internet" | "expensas" | "ABL" | "ARBA" | "seguro_hogar"> = {
+  luz: "luz",
+  gas: "gas",
+  agua: "agua",
+  internet: "internet",
+  expensas: "expensas",
+  abl: "ABL",
+  arba: "ARBA",
+  seguro: "seguro_hogar",
+};
+
+export function tipoGastoDeServicio(nombre: string) {
+  return TIPO_GASTO[nombre.trim().toLowerCase()] ?? ("otro" as const);
+}
+
 /** Emoji del servicio según su nombre ("Luz" → ⚡). Los que no están en la lista llevan 📌. */
 export function iconoServicio(nombre: string): string {
   const n = nombre.trim().toLowerCase();

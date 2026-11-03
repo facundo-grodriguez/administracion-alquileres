@@ -46,7 +46,7 @@ export async function actualizar(
 export async function guardarMes(
   servicioId: string,
   periodo: string,
-  datos: { fechaVencimiento?: string; fechaPago?: string; monto?: string | null },
+  datos: { fechaVencimiento?: string; fechaPago?: string; monto?: string | null; gastoId?: string | null },
 ): Promise<MesServicio> {
   const filas = await db
     .insert(serviciosVencimientoMes)

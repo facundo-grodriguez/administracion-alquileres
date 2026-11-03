@@ -227,8 +227,8 @@ export const gastosPropiedad = pgTable(
 
 /**
  * Vencimientos de servicios (v9.8.0): luz, gas, celular, prepaga... que vencen todos los meses el
- * mismo día. Son un recordatorio del administrador: no son gastos ni tocan el balance.
- * Sin propiedad = servicio personal.
+ * mismo día. Son un recordatorio del administrador. Sin propiedad = servicio personal (no toca el
+ * balance); si es de una propiedad, al pagarlo se carga también como gasto de esa propiedad (v9.9.0).
  */
 export const serviciosVencimiento = pgTable("servicios_vencimiento", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -252,6 +252,8 @@ export const serviciosVencimientoMes = pgTable(
     fechaVencimiento: date("fecha_vencimiento"),
     fechaPago: date("fecha_pago"),
     monto: numeric("monto", { precision: 12, scale: 2 }),
+    /** v9.9.0: si es de una propiedad, el gasto que se cargó al pagarlo (para corregirlo sin duplicar). */
+    gastoId: uuid("gasto_id").references(() => gastosPropiedad.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [unique("servicios_vencimiento_mes_servicio_periodo_uq").on(t.servicioId, t.periodo)],

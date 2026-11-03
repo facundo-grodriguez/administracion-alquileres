@@ -1,9 +1,11 @@
 // Avisos de vencimientos de servicios (v9.8.0): el bot los manda solo, 3 días antes y el mismo día,
-// con botones para marcarlo pagado o cambiar la fecha de ese mes. Se resuelven sin OpenAI.
+// con botones para marcarlo pagado o cambiar la fecha de ese mes. Se resuelven sin OpenAI. Si el
+// servicio es de una propiedad, "Ya lo pagué" pregunta el monto real para cargarlo como gasto (v9.9.0).
 //
 // callback_data: "sv:pag:<servicioId>:<YYYY-MM>" (ya lo pagué) y "sv:fec:<servicioId>:<YYYY-MM>" (cambió la fecha).
 import { type Bot, InlineKeyboard } from "grammy";
 import { marcarServicioPagadoTool } from "../../core/assistant/tools/marcarServicioPagado.tool.js";
+import { etiquetaPagoServicio, idPagoServicio } from "../../core/flows/definiciones/serviciosVencimiento.flow.js";
 import { type DatosFlujo, etiquetaKey, type FlowId } from "../../core/flows/types.js";
 import * as serviciosService from "../../core/services/serviciosVencimiento.service.js";
 import { formatoFechaAR, formatoPeriodoAR, hoyISO } from "../../core/util/fecha.js";
@@ -43,6 +45,18 @@ export async function resolverCallbackServicio(datos: string): Promise<Resultado
       return {
         tipo: "respuesta",
         texto: `${nombreServicio(v.nombre, v.propiedad)} de ${formatoPeriodoAR(v.periodo)} ya estaba pagado (el ${formatoFechaAR(v.fechaPago)}).`,
+      };
+    }
+    // De una propiedad: se carga como gasto, así que se pregunta el monto real (y quién pagó si está alquilada).
+    if (v.propiedadId) {
+      return {
+        tipo: "flujo",
+        flowId: "pagar_servicio",
+        datos: {
+          vencimiento: await idPagoServicio(v),
+          [etiquetaKey("vencimiento")]: etiquetaPagoServicio(v),
+          fecha_pago: hoyISO(),
+        },
       };
     }
     return {

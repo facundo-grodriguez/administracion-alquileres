@@ -7,6 +7,7 @@ import {
   nombreServicio,
   periodoPendiente,
   periodoSiguiente,
+  tipoGastoDeServicio,
   vencimientoDelMes,
 } from "../src/core/util/vencimientoServicio.js";
 
@@ -82,5 +83,17 @@ describe("textos de servicios", () => {
     expect(iconoServicio("Gimnasio")).toBe("📌");
     expect(nombreServicio("Luz")).toBe("⚡ Luz (Personal)");
     expect(nombreServicio("Gas", "Cerrito 4070")).toBe("🔥 Gas (Cerrito 4070)");
+  });
+});
+
+describe("rubro del gasto al pagar un servicio de propiedad", () => {
+  it("los servicios conocidos van a su rubro y el resto a 'otro'", () => {
+    expect(tipoGastoDeServicio("Luz")).toBe("luz");
+    expect(tipoGastoDeServicio(" expensas ")).toBe("expensas");
+    expect(tipoGastoDeServicio("ABL")).toBe("ABL");
+    expect(tipoGastoDeServicio("arba")).toBe("ARBA");
+    expect(tipoGastoDeServicio("Seguro")).toBe("seguro_hogar");
+    expect(tipoGastoDeServicio("Alarma")).toBe("otro");
+    expect(tipoGastoDeServicio("Celular")).toBe("otro");
   });
 });

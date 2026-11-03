@@ -2,6 +2,19 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.9.0] — 2026-11-03 — Servicios de propiedad suman al gasto
+> 🏠 Al pagar un servicio de una propiedad, se carga también como gasto de esa propiedad
+> 💲 "Ya lo pagué" te pregunta el monto real (con botón para usar el aproximado)
+> 👤 Si la propiedad está alquilada, pregunta quién lo pagó; si no, resta del balance
+
+Los vencimientos personales siguen siendo solo recordatorios. Los de una propiedad, al marcarlos pagados
+(desde el aviso, en "✅ Pagar servicio" o escribiéndolo), crean un gasto de la propiedad con el rubro que
+corresponde (luz, gas, expensas, ABL...; lo que no está en la lista va como "otro" con su nombre). Si la
+propiedad no tiene contrato vigente lo paga el propietario y resta del balance; si está alquilada se
+pregunta si lo pagó el propietario o el inquilino (lo del inquilino queda anotado y no resta). Volver a
+marcar el mismo mes corrige ese gasto en vez de duplicarlo. Columna nueva `servicios_vencimiento_mes.gasto_id`
+(migración 0007, que el bot aplica solo al arrancar).
+
 ## [9.8.0] — 2026-11-02 — Vencimientos de servicios
 > 📅 Agendá vencimientos de servicios (luz, gas, celular, prepaga...), tuyos o de una propiedad
 > ⏰ El bot te avisa 3 días antes y el mismo día, con botones "Ya lo pagué" y "Cambió la fecha"

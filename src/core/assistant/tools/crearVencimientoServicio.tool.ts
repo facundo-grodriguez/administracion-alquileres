@@ -12,7 +12,7 @@ export const crearVencimientoServicioTool = defineTool({
     "Agenda el vencimiento mensual de un servicio para que el bot avise antes de que venza: luz, gas, agua, " +
     "internet, celular, expensas, ABL, ARBA, seguro, prepaga, tarjeta u otro. Puede ser personal del administrador " +
     "(sin propiedad) o de una propiedad (usar buscar_propiedad primero). Usar cuando diga cosas como " +
-    "'la luz vence el 15', 'agendá que el celular vence los 10'. Es solo un recordatorio: no es un gasto ni toca el balance.",
+    "'la luz vence el 15', 'agendá que el celular vence los 10'. Es un recordatorio; si es de una propiedad, al marcarlo pagado se carga también como gasto de esa propiedad.",
   inputSchema: z.object({
     nombre: z.string().describe("Ej: Luz, Gas, Celular, Prepaga, Tarjeta Visa"),
     dia_vencimiento: z.number().int().min(1).max(31).describe("Día del mes en que vence"),
