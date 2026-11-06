@@ -1,7 +1,7 @@
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { leerCredenciales, tokenDeAcceso } from "../src/core/planilla/googleAuth.js";
-import { rango } from "../src/core/planilla/sheetsApi.js";
+import { ClienteSheets, rango } from "../src/core/planilla/sheetsApi.js";
 import { idDePlanilla } from "../src/core/planilla/sincronizarPlanilla.js";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -60,5 +60,25 @@ describe("planilla", () => {
   it("los nombres de pestaña van entre comillas en los rangos", () => {
     expect(rango("Gastos propiedades", "A1")).toBe("'Gastos propiedades'!A1");
     expect(rango("Resumen")).toBe("'Resumen'");
+  });
+
+  it("usa las direcciones correctas de la API de Sheets", async () => {
+    const urls: string[] = [];
+    const fetchFalso = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ sheets: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const cliente = new ClienteSheets("ID", async () => "token", fetchFalso);
+    await cliente.pestanas();
+    await cliente.cambios([{}]);
+    await cliente.limpiar(["'Resumen'"]);
+    await cliente.escribir([{ range: "'Resumen'!A1", values: [["x"]] }]);
+    const base = "https://sheets.googleapis.com/v4/spreadsheets/ID";
+    expect(urls).toEqual([
+      `${base}?fields=sheets.properties(sheetId,title)`,
+      `${base}:batchUpdate`,
+      `${base}/values:batchClear`,
+      `${base}/values:batchUpdate`,
+    ]);
   });
 });

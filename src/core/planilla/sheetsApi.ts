@@ -18,7 +18,9 @@ export class ClienteSheets {
       body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
     });
     if (!respuesta.ok) {
-      const detalle = (await respuesta.text()).slice(0, 300);
+      const texto = await respuesta.text();
+      // Google a veces responde con una página HTML: no tiene sentido mostrarla.
+      const detalle = texto.trimStart().startsWith("<") ? "" : texto.slice(0, 300);
       if (respuesta.status === 403 || respuesta.status === 404) {
         throw new Error(
           `No puedo abrir la planilla (${respuesta.status}). ¿La compartiste como Editor con la cuenta de servicio? ${detalle}`,
@@ -42,11 +44,11 @@ export class ClienteSheets {
   }
 
   async limpiar(rangos: string[]): Promise<void> {
-    await this.llamar(":values:batchClear", { ranges: rangos });
+    await this.llamar("/values:batchClear", { ranges: rangos });
   }
 
   async escribir(datos: { range: string; values: unknown[][] }[]): Promise<void> {
-    await this.llamar(":values:batchUpdate", { valueInputOption: "USER_ENTERED", data: datos });
+    await this.llamar("/values:batchUpdate", { valueInputOption: "USER_ENTERED", data: datos });
   }
 }
 

@@ -2,6 +2,13 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.10.1] — 2026-11-06 — Arreglo de la planilla de Google
+> 📊 La planilla de Google ya se completa: el bot escribía en una dirección equivocada
+
+Para borrar y escribir las pestañas se usaba `…/{id}:values:batchClear` en vez de
+`…/{id}/values:batchClear` (igual con `batchUpdate`) y Google respondía 400. Si Google devuelve una
+página de error, el mensaje de `/planilla` ya no la muestra entera.
+
 ## [9.10.0] — 2026-11-06 — Planilla de Google y servicios más claros
 > 📊 Planilla de Google que se actualiza sola: resumen, alquileres, gastos y servicios personales
 > 👤🏠 En 📅 Servicios del mes, lo personal y cada propiedad por separado; lo pagado, abajo y aparte
