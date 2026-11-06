@@ -11,9 +11,9 @@ Las consultas no la tocan: solo se reescribe si algo cambió.
 | **Resumen** | Una fila por propiedad: propietario, si está alquilada o libre, inquilino, alquiler actual, cobrado / gastos / neto del año (lo mismo que 💵 Balance) y meses adeudados. Total al final. |
 | **Alquileres** | Mes a mes de cada contrato (el más nuevo arriba): monto, vencimiento, estado (Pagado / Pendiente / Atrasado / Parcial) y fecha de pago. |
 | **Gastos propiedades** | Cada gasto de cada propiedad: rubro, detalle, quién paga, monto, estado, fecha de pago y si resta del balance. Incluye los servicios de propiedad pagados desde el recordatorio. |
-| **Servicios personales** | Tus servicios (Monotributo, celular...) mes a mes, hasta el mes que viene: monto, estado y fecha de pago. |
+| **Servicios personales** | Cuadro con una fila por servicio (Monotributo, celular...) y una columna por mes, el más nuevo a la izquierda, hasta el mes actual. Cada celda dice monto y estado en color: 🟩 pagado (con la fecha), 🟨 por vencer, 🟥 vencido sin pagar. Abajo, el total pagado y lo que falta pagar de cada mes. La columna "Termina" muestra la última cuota o si se dio de baja. |
 
-Cada pestaña tiene filtro en el encabezado. **No escribas a mano dentro de estas pestañas**: el bot las
+Las pestañas de listas tienen filtro en el encabezado (el cuadro de servicios no). **No escribas a mano dentro de estas pestañas**: el bot las
 reescribe enteras en cada actualización. Si querés hacer cuentas propias, usá una pestaña nueva (el bot
 no toca las pestañas que no son suyas) o una copia.
 

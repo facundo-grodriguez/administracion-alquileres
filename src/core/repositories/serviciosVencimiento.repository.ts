@@ -12,6 +12,7 @@ export async function crear(datos: {
   propiedadId?: string | null;
   diaVencimiento: number;
   monto?: string | null;
+  hastaPeriodo?: string | null;
 }): Promise<ServicioVencimiento> {
   const filas = await db.insert(serviciosVencimiento).values(datos).returning();
   return filas[0]!;
@@ -37,7 +38,7 @@ export async function listarTodos() {
 
 export async function actualizar(
   id: string,
-  datos: { diaVencimiento?: number; monto?: string | null; activo?: boolean },
+  datos: { diaVencimiento?: number; monto?: string | null; activo?: boolean; hastaPeriodo?: string | null },
 ): Promise<ServicioVencimiento | undefined> {
   const filas = await db
     .update(serviciosVencimiento)

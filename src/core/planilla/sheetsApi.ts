@@ -2,7 +2,7 @@
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 
-export type PestanaExistente = { id: number; titulo: string };
+export type PestanaExistente = { id: number; titulo: string; conFiltro: boolean };
 
 export class ClienteSheets {
   constructor(
@@ -32,10 +32,14 @@ export class ClienteSheets {
   }
 
   async pestanas(): Promise<PestanaExistente[]> {
-    const json = await this.llamar<{ sheets: { properties: { sheetId: number; title: string } }[] }>(
-      "?fields=sheets.properties(sheetId,title)",
-    );
-    return json.sheets.map((s) => ({ id: s.properties.sheetId, titulo: s.properties.title }));
+    const json = await this.llamar<{
+      sheets: { properties: { sheetId: number; title: string }; basicFilter?: unknown }[];
+    }>("?fields=sheets(properties(sheetId,title),basicFilter.range)");
+    return json.sheets.map((s) => ({
+      id: s.properties.sheetId,
+      titulo: s.properties.title,
+      conFiltro: s.basicFilter !== undefined,
+    }));
   }
 
   async cambios(requests: unknown[]): Promise<{ replies?: { addSheet?: { properties: { sheetId: number } } }[] }> {

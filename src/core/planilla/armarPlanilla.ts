@@ -7,14 +7,33 @@ import { valorVigente } from "../services/actualizacionAlquiler.service.js";
 import { calcularBalance } from "../services/movimientos.service.js";
 import { historialPagos, type PeriodoHistorial } from "../services/pagos.service.js";
 import * as serviciosService from "../services/serviciosVencimiento.service.js";
-import { hoyISO } from "../util/fecha.js";
+import { formatoPeriodoAR, hoyISO } from "../util/fecha.js";
 import { entraEnBalance } from "../util/responsableGasto.js";
 
 /** Texto, número o fecha ISO (YYYY-MM-DD); null = celda vacía. */
 export type Celda = string | number | null;
 export type TipoColumna = "texto" | "fecha" | "mes" | "monto";
 export type Columna = { titulo: string; tipo?: TipoColumna };
-export type Pestana = { titulo: string; columnas: Columna[]; filas: Celda[][] };
+export type Color = { red: number; green: number; blue: number };
+export type Pestana = {
+  titulo: string;
+  columnas: Columna[];
+  filas: Celda[][];
+  /** Fondo de cada celda (mismo orden que `filas`); null = sin color. */
+  fondos?: (Color | null)[][];
+  /** Índices de `filas` que van en negrita (los totales). */
+  negritas?: number[];
+  /** Columnas fijas a la izquierda al desplazarse (además del encabezado). */
+  columnasFijas?: number;
+  /** Sin filtro en el encabezado (un cuadro de meses no se filtra por columna). */
+  sinFiltro?: boolean;
+};
+
+export const COLORES = {
+  pagado: { red: 0.85, green: 0.94, blue: 0.85 },
+  vencido: { red: 0.98, green: 0.85, blue: 0.85 },
+  pendiente: { red: 1, green: 0.95, blue: 0.8 },
+} satisfies Record<string, Color>;
 
 export const PESTANAS = {
   resumen: "Resumen",
@@ -117,28 +136,81 @@ async function gastos(): Promise<Pestana> {
   };
 }
 
+type Personal = serviciosService.VencimientoServicio;
+
+/** Solo el monto; el estado va en el color (sin monto cargado, un ✓ o un –). */
+function celdaPersonal(v: Personal, hoy: string): { valor: Celda; fondo: Color } {
+  const fondo = v.fechaPago ? COLORES.pagado : v.fechaVencimiento < hoy ? COLORES.vencido : COLORES.pendiente;
+  return { valor: v.monto ? Number(v.monto) : v.fechaPago ? "✓" : "–", fondo };
+}
+
+const LEYENDA = "🟩 pagado   🟨 por vencer   🟥 vencido sin pagar";
+
+/** "Última cuota Diciembre 2026", "Dado de baja (hasta Noviembre 2026)" o vacío si sigue sin fin. */
+function termina(v: Personal): string | null {
+  if (v.activo) return v.hastaPeriodo ? `Última cuota ${formatoPeriodoAR(v.hastaPeriodo)}` : null;
+  return v.hastaPeriodo ? `Dado de baja (hasta ${formatoPeriodoAR(v.hastaPeriodo)})` : "Dado de baja";
+}
+
+/**
+ * Cuadro de servicios personales (v9.11.0): una fila por servicio y una columna por mes (el más
+ * nuevo a la izquierda). Cada celda es solo el monto y el estado va en el color; abajo, el total
+ * pagado y por pagar de cada mes.
+ */
 async function personales(hoy: string): Promise<Pestana> {
-  const items = (await serviciosService.historialPersonales(hoy)).sort(
-    (a, b) => b.periodo.localeCompare(a.periodo) || a.fechaVencimiento.localeCompare(b.fechaVencimiento),
+  const items = await serviciosService.historialPersonales(hoy);
+  const meses = [...new Set(items.map((v) => v.periodo))].sort().reverse();
+  const servicios = new Map<string, Personal[]>();
+  for (const v of items) servicios.set(v.servicioId, [...(servicios.get(v.servicioId) ?? []), v]);
+  const orden = [...servicios.values()].sort(
+    (a, b) => a[0]!.diaVencimiento - b[0]!.diaVencimiento || a[0]!.nombre.localeCompare(b[0]!.nombre),
   );
+
+  const filas: Celda[][] = [];
+  const fondos: (Color | null)[][] = [];
+  const pagado = meses.map(() => 0);
+  const falta = meses.map(() => 0);
+  for (const delServicio of orden) {
+    const primero = delServicio[0]!;
+    const fila: Celda[] = [primero.nombre, `día ${primero.diaVencimiento}`, termina(primero)];
+    const fondo: (Color | null)[] = [null, null, null];
+    meses.forEach((periodo, i) => {
+      const v = delServicio.find((m) => m.periodo === periodo);
+      if (!v) {
+        fila.push(null);
+        fondo.push(null);
+        return;
+      }
+      const c = celdaPersonal(v, hoy);
+      fila.push(c.valor);
+      fondo.push(c.fondo);
+      if (v.fechaPago) pagado[i]! += Number(v.monto ?? 0);
+      else falta[i]! += Number(v.monto ?? 0);
+    });
+    filas.push(fila);
+    fondos.push(fondo);
+  }
+  const negritas: number[] = [];
+  if (orden.length > 0) {
+    filas.push([]);
+    negritas.push(filas.length, filas.length + 1);
+    filas.push(["Pagado", null, null, ...pagado]);
+    filas.push(["Falta pagar", null, null, ...falta]);
+    filas.push([], [LEYENDA]);
+  }
   return {
     titulo: PESTANAS.personales,
     columnas: [
-      { titulo: "Mes", tipo: "mes" },
       { titulo: "Servicio" },
-      { titulo: "Vence", tipo: "fecha" },
-      { titulo: "Monto", tipo: "monto" },
-      { titulo: "Estado" },
-      { titulo: "Pagado el", tipo: "fecha" },
+      { titulo: "Vence" },
+      { titulo: "Termina" },
+      ...meses.map((m) => ({ titulo: formatoPeriodoAR(m), tipo: "monto" as const })),
     ],
-    filas: items.map((v) => [
-      primeroDeMes(v.periodo),
-      v.nombre,
-      v.fechaVencimiento,
-      num(v.monto),
-      v.fechaPago ? "Pagado" : v.fechaVencimiento < hoy ? "Vencido" : "Pendiente",
-      v.fechaPago,
-    ]),
+    filas,
+    fondos,
+    negritas,
+    columnasFijas: 1,
+    sinFiltro: true,
   };
 }
 
@@ -175,8 +247,11 @@ async function resumen(
       adeudados,
     ]);
   }
-  if (propiedades.length > 1)
+  const negritas: number[] = [];
+  if (propiedades.length > 1) {
+    negritas.push(filas.length);
     filas.push(["Total", null, null, null, null, totales.ingresos, totales.gastos, totales.neto, totales.adeudados]);
+  }
   return {
     titulo: PESTANAS.resumen,
     columnas: [
@@ -191,6 +266,7 @@ async function resumen(
       { titulo: "Meses adeudados" },
     ],
     filas,
+    negritas,
   };
 }
 

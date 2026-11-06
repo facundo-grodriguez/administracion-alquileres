@@ -2,6 +2,26 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.11.0] — 2026-11-06 — Cuotas que terminan y cuadro de servicios
+> 🔚 Servicios con última cuota: avisa hasta ese mes y después se apaga solo
+> 🗑️ Dar de baja ya no borra el seguimiento: lo cargado queda en la planilla
+> 📊 Servicios personales en un cuadro: una fila por servicio y una columna por mes, con colores
+> 👥 En 📅 Servicios del mes: ver todo, solo lo personal o solo las propiedades, y el total pagado
+
+Al agendar un vencimiento se pregunta si vence todos los meses o termina en un mes (cuotas); en
+"✏️ Modificar" se suma "🔚 Cuándo termina". Después del último mes no avisa, no aparece para pagar ni
+en los meses siguientes, y lo pagado queda. Dar de baja guarda el seguimiento hasta este mes si ya
+tiene algo cargado (si no, hasta el anterior). Columna nueva `hasta_periodo` (migración 0008, se
+aplica sola al arrancar).
+
+La pestaña "Servicios personales" pasa a ser un cuadro servicio × mes (el más nuevo a la izquierda y
+sin meses futuros, salvo que ya estén pagados): cada celda es solo el monto y el estado va en el
+color (verde pagado, amarillo por vencer, rojo vencido), con los totales "Pagado" y "Falta pagar" abajo.
+
+"📅 Servicios del mes" deja una línea en blanco entre lo personal y cada propiedad, suma botones
+👥 Todo / 👤 Personal / 🏠 Propiedades (los meses anteriores mantienen el filtro) y muestra el total
+pagado al lado de "✅ Pagados". Cada grupo (👤 Personal y cada 🏠 propiedad) muestra su subtotal. Arregla el punto doble en "Actualizado ... p. m..".
+
 ## [9.10.1] — 2026-11-06 — Arreglo de la planilla de Google
 > 📊 La planilla de Google ya se completa: el bot escribía en una dirección equivocada
 

@@ -73,6 +73,31 @@ export function existiaEnPeriodo(creadoEl: Date, periodo: string, tieneDatosDelM
 }
 
 /**
+ * Si un servicio cuenta en un mes (v9.11.0): no antes de cargarlo (salvo que tenga algo de ese mes),
+ * nunca después de su último mes (`hastaPeriodo`: última cuota o mes de la baja). Los dados de baja
+ * antes de v9.11.0 no tienen último mes: solo cuentan los meses con algo cargado.
+ */
+export function correspondeAlPeriodo(
+  servicio: { createdAt: Date; activo: boolean; hastaPeriodo: string | null },
+  periodo: string,
+  tieneDatosDelMes: boolean,
+): boolean {
+  if (servicio.hastaPeriodo && periodo > servicio.hastaPeriodo) return false;
+  if (!servicio.activo && !servicio.hastaPeriodo) return tieneDatosDelMes;
+  return existiaEnPeriodo(servicio.createdAt, periodo, tieneDatosDelMes);
+}
+
+/**
+ * Último mes que queda al dar de baja un servicio: este mes si ya tiene algo cargado (lo pagaste o
+ * cambiaste la fecha), si no el anterior. Si ya terminaba antes, queda como estaba.
+ */
+export function ultimoMesAlDarDeBaja(hoy: string, tieneDatosEsteMes: boolean, hastaActual: string | null): string {
+  const actual = hoy.slice(0, 7);
+  const hasta = tieneDatosEsteMes ? actual : periodoAnterior(actual);
+  return hastaActual && hastaActual < hasta ? hastaActual : hasta;
+}
+
+/**
  * Fecha de vencimiento de un mes a partir del día fijo. Si el mes no tiene ese día
  * (ej. día 31 en noviembre), vence el último día del mes.
  */

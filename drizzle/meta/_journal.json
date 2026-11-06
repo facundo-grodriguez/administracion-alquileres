@@ -57,6 +57,13 @@
       "when": 1793713728376,
       "tag": "0007_servicio_mes_gasto",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793988046466,
+      "tag": "0008_servicio_hasta",
+      "breakpoints": true
     }
   ]
 }

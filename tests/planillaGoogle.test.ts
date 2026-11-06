@@ -75,7 +75,7 @@ describe("planilla", () => {
     await cliente.escribir([{ range: "'Resumen'!A1", values: [["x"]] }]);
     const base = "https://sheets.googleapis.com/v4/spreadsheets/ID";
     expect(urls).toEqual([
-      `${base}?fields=sheets.properties(sheetId,title)`,
+      `${base}?fields=sheets(properties(sheetId,title),basicFilter.range)`,
       `${base}:batchUpdate`,
       `${base}/values:batchClear`,
       `${base}/values:batchUpdate`,

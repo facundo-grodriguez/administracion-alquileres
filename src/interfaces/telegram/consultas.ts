@@ -185,12 +185,28 @@ async function gastosPendientesTexto(): Promise<string> {
   return `💡 Gastos sin pagar (${gastos.length}):\n\n${lineas.join("\n")}`;
 }
 
-// Servicios: "cq:serv" muestra el mes actual y "cq:serv:<YYYY-MM>" otro mes.
-async function serviciosDelMes(periodo?: string): Promise<RespuestaConsulta> {
+const FILTROS: { valor: serviciosService.FiltroServicios; corto: string; texto: string }[] = [
+  { valor: "todos", corto: "t", texto: "👥 Todo" },
+  { valor: "personal", corto: "p", texto: "👤 Personal" },
+  { valor: "propiedades", corto: "r", texto: "🏠 Propiedades" },
+];
+
+// Servicios: "cq:serv" muestra el mes actual, "cq:serv:<YYYY-MM>" otro mes y
+// "cq:serv:<YYYY-MM>:<t|p|r>" filtra todo / personal / propiedades.
+async function serviciosDelMes(periodo?: string, filtroCorto?: string): Promise<RespuestaConsulta> {
   const hoy = hoyISO();
   const p = periodo && /^\d{4}-\d{2}$/.test(periodo) ? periodo : hoy.slice(0, 7);
-  const items = await serviciosService.delMes(p, hoy);
+  const filtro = FILTROS.find((f) => f.corto === filtroCorto) ?? FILTROS[0]!;
+  const todos = await serviciosService.delMes(p, hoy);
+  const items = serviciosService.filtrarServicios(todos, filtro.valor);
   const teclado = new InlineKeyboard();
+  // Ver todo, solo lo personal o solo las propiedades (el elegido lleva ✓).
+  if (todos.length > 0) {
+    for (const f of FILTROS) {
+      teclado.text(f.valor === filtro.valor ? `✓ ${f.texto}` : f.texto, `${PREFIJO}serv:${p}:${f.corto}`);
+    }
+    teclado.row();
+  }
   const esPasado = p < hoy.slice(0, 7);
   // "Pagar servicio" paga lo pendiente de ahora: no se ofrece mirando un mes que ya pasó.
   if (!esPasado && items.some((v) => !v.fechaPago)) teclado.text("✅ Pagar servicio", "flujo:iniciar:pagar_servicio");
@@ -199,11 +215,11 @@ async function serviciosDelMes(periodo?: string): Promise<RespuestaConsulta> {
     // Moverse entre meses: para atrás se ve qué se pagó y cuándo.
     const anterior = periodoAnterior(p);
     const siguiente = periodoSiguiente(p);
-    teclado.text(`⬅️ ${formatoPeriodoAR(anterior)}`, `${PREFIJO}serv:${anterior}`);
-    teclado.text(`➡️ ${formatoPeriodoAR(siguiente)}`, `${PREFIJO}serv:${siguiente}`).row();
+    teclado.text(`⬅️ ${formatoPeriodoAR(anterior)}`, `${PREFIJO}serv:${anterior}:${filtro.corto}`);
+    teclado.text(`➡️ ${formatoPeriodoAR(siguiente)}`, `${PREFIJO}serv:${siguiente}:${filtro.corto}`).row();
     if (items.length > 0) teclado.text("✏️ Cambiar uno", "flujo:iniciar:editar_vencimiento_servicio");
   }
-  return { texto: serviciosService.textoDelMes(items, p, hoy), teclado: botonOtraConsulta(teclado) };
+  return { texto: serviciosService.textoDelMes(items, p, hoy, filtro.valor), teclado: botonOtraConsulta(teclado) };
 }
 
 async function porContrato(op: string, contratoId: string): Promise<RespuestaConsulta> {
@@ -238,7 +254,7 @@ async function porContrato(op: string, contratoId: string): Promise<RespuestaCon
 export async function responderConsulta(datos: string): Promise<RespuestaConsulta> {
   const { op, contratoId, extra } = parseCallbackConsulta(datos);
   if (op === "bal") return balance(contratoId, extra);
-  if (op === "serv") return serviciosDelMes(contratoId);
+  if (op === "serv") return serviciosDelMes(contratoId, extra);
   if (contratoId) return porContrato(op, contratoId);
 
   const opcion = OPCIONES_CONSULTA.find((o) => o.op === op);

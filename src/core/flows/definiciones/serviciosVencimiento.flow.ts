@@ -15,6 +15,13 @@ import { type CandidatoFlujo, type DatosFlujo, type DefinicionFlujo, etiquetaKey
 const nombreElegido = (datos: DatosFlujo) =>
   datos.servicio === "otro" ? String(datos.nombre_otro ?? "").trim() : String(datos.servicio);
 
+const OPCIONES_TERMINA = [
+  { valor: "sin_fin", etiqueta: "🔁 Todos los meses" },
+  { valor: "mes", etiqueta: "🔚 Termina en un mes (cuotas)" },
+];
+
+const PREGUNTA_HASTA = "¿Cuál es el último mes que vence? (MM/AAAA, ej. 12/2026)";
+
 const filtrar = <T extends { etiqueta: string }>(items: T[], query: string) => {
   const q = query.trim().toLowerCase();
   return items.filter((c) => !q || c.etiqueta.toLowerCase().includes(q));
@@ -61,6 +68,17 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
       campo: { tipo: "monto", opcional: true },
     },
     {
+      id: "termina",
+      pregunta: () => "¿Vence todos los meses o termina (por ejemplo, cuotas)?",
+      campo: { tipo: "opciones", opciones: OPCIONES_TERMINA },
+    },
+    {
+      id: "hasta",
+      pregunta: () => PREGUNTA_HASTA,
+      campo: { tipo: "periodo" },
+      saltar: (datos) => datos.termina !== "mes",
+    },
+    {
       id: "__confirmar",
       pregunta: (datos) =>
         [
@@ -69,6 +87,7 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
           nombreServicio(nombreElegido(datos), datos[etiquetaKey("propiedad_id")] as string | undefined),
           `Vence el día ${datos.dia} de cada mes`,
           datos.monto ? `Monto aprox.: ${formatoARS(datos.monto as string)}` : null,
+          datos.termina === "mes" ? `Última cuota: ${formatoPeriodoAR(datos.hasta as string)}` : null,
           "",
           `Te aviso ${DIAS_AVISO_PREVIO} días antes y el mismo día, hasta que lo marques como pagado.`,
         ]
@@ -83,6 +102,7 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
       dia_vencimiento: Number(datos.dia),
       propiedad_id: datos.de_quien === "propiedad" || datos.propiedad_id ? (datos.propiedad_id as string) : undefined,
       monto: datos.monto as string | undefined,
+      hasta_periodo: datos.termina === "mes" ? (datos.hasta as string) : undefined,
     }),
 };
 
@@ -217,7 +237,7 @@ async function buscarServicios(query: string): Promise<CandidatoFlujo[]> {
   return filtrar(
     servicios.map((s) => ({
       id: s.id,
-      etiqueta: `${nombreServicio(s.nombre, s.propiedad?.direccion)} — día ${s.diaVencimiento}`,
+      etiqueta: `${nombreServicio(s.nombre, s.propiedad?.direccion)} — día ${s.diaVencimiento}${s.hastaPeriodo ? ` — hasta ${formatoPeriodoAR(s.hastaPeriodo)}` : ""}`,
     })),
     query,
   );
@@ -242,6 +262,7 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
           { valor: "fecha_este_mes", etiqueta: "📅 La fecha de este mes" },
           { valor: "dia_fijo", etiqueta: "🔁 El día de todos los meses" },
           { valor: "monto", etiqueta: "💲 El monto" },
+          { valor: "termina", etiqueta: "🔚 Cuándo termina (última cuota)" },
           { valor: "baja", etiqueta: "🗑️ Dar de baja" },
         ],
       },
@@ -266,9 +287,27 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
       saltar: (datos) => datos.accion !== "monto",
     },
     {
+      id: "termina",
+      pregunta: () => "¿Hasta cuándo vence?",
+      campo: {
+        tipo: "opciones",
+        opciones: [
+          { valor: "mes", etiqueta: "🔚 Termina en un mes (última cuota)" },
+          { valor: "sin_fin", etiqueta: "🔁 Todos los meses, sin fin" },
+        ],
+      },
+      saltar: (datos) => datos.accion !== "termina",
+    },
+    {
+      id: "hasta",
+      pregunta: () => PREGUNTA_HASTA,
+      campo: { tipo: "periodo" },
+      saltar: (datos) => datos.accion !== "termina" || datos.termina !== "mes",
+    },
+    {
       id: "__confirmar",
       pregunta: (datos) => {
-        const servicio = String(datos[etiquetaKey("servicio_id")]).replace(/ — día \d+$/, "");
+        const servicio = String(datos[etiquetaKey("servicio_id")]).replace(/ — día \d+.*$/, "");
         switch (datos.accion) {
           case "fecha_este_mes":
             return `Confirmá: ${servicio} vence el ${formatoFechaAR(datos.fecha as string)} solo esta vez. Los otros meses siguen igual.`;
@@ -276,8 +315,12 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
             return `Confirmá: ${servicio} pasa a vencer el día ${datos.dia} de cada mes.`;
           case "monto":
             return `Confirmá: ${servicio} — monto aprox. ${formatoARS(datos.monto as string)}.`;
+          case "termina":
+            return datos.termina === "mes"
+              ? `Confirmá: la última cuota de ${servicio} es ${formatoPeriodoAR(datos.hasta as string)}. Después no te aviso más y lo pagado queda en el seguimiento.`
+              : `Confirmá: ${servicio} vence todos los meses, sin fecha de fin.`;
           default:
-            return `Confirmá: dar de baja ${servicio}. No te aviso más.`;
+            return `Confirmá: dar de baja ${servicio}. No te aviso más, pero lo ya cargado queda en el seguimiento.\n\nSi son cuotas, mejor elegí "🔚 Cuándo termina": así te avisa hasta la última.`;
         }
       },
       campo: { tipo: "confirmacion" },
@@ -286,10 +329,11 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
   ejecutar: (datos) =>
     modificarVencimientoServicioTool.run({
       servicio_id: datos.servicio_id as string,
-      accion: datos.accion as "fecha_este_mes" | "dia_fijo" | "monto" | "baja",
+      accion: datos.accion as "fecha_este_mes" | "dia_fijo" | "monto" | "termina" | "baja",
       periodo: datos.periodo as string | undefined,
       fecha: datos.fecha as string | undefined,
       dia: datos.dia === undefined ? undefined : Number(datos.dia),
       monto: datos.monto as string | undefined,
+      hasta_periodo: datos.accion === "termina" && datos.termina === "mes" ? (datos.hasta as string) : undefined,
     }),
 };

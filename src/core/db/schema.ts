@@ -237,6 +237,8 @@ export const serviciosVencimiento = pgTable("servicios_vencimiento", {
   diaVencimiento: integer("dia_vencimiento").notNull(),
   monto: numeric("monto", { precision: 12, scale: 2 }),
   activo: boolean("activo").notNull().default(true),
+  /** v9.11.0: último mes que corresponde (YYYY-MM): la última cuota, o el mes de la baja. Null = sin fin. */
+  hastaPeriodo: varchar("hasta_periodo", { length: 7 }),
   ...timestamps,
 });
 

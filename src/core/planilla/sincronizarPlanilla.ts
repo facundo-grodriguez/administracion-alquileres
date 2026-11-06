@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { env } from "../../config/env.js";
 import { armarPlanilla, type Celda, type Pestana, type TipoColumna } from "./armarPlanilla.js";
 import { type CredencialesGoogle, leerCredenciales, tokenDeAcceso } from "./googleAuth.js";
-import { ClienteSheets, rango } from "./sheetsApi.js";
+import { ClienteSheets, type PestanaExistente, rango } from "./sheetsApi.js";
 
 export type ConfigPlanilla = { planillaId: string; cred: CredencialesGoogle };
 
@@ -58,7 +58,7 @@ function actualizadoEl(): string {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date());
-  return `Actualizado: ${fecha}. Se actualiza sola con cada cambio que hagas en el bot.`;
+  return `Actualizado el ${fecha} — se actualiza sola con cada cambio que hagas en el bot.`;
 }
 
 function valores(p: Pestana, esResumen: boolean): (string | number)[][] {
@@ -67,13 +67,20 @@ function valores(p: Pestana, esResumen: boolean): (string | number)[][] {
   return filas;
 }
 
-/** Formato de cada pestaña: encabezado fijo y en negrita, fechas y montos con su formato, columnas a medida. */
-function formato(p: Pestana, sheetId: number, esNueva: boolean): unknown[] {
+const BLANCO = { red: 1, green: 1, blue: 1 };
+
+/**
+ * Formato de cada pestaña: encabezado fijo y en negrita, fechas y montos con su formato, colores de
+ * cada celda, totales en negrita y columnas a medida. Antes se limpia el formato de los datos, por si
+ * la pestaña tenía otra forma.
+ */
+function formato(p: Pestana, hoja: PestanaExistente, esNueva: boolean): unknown[] {
+  const sheetId = hoja.id;
   const requests: unknown[] = [
     {
       updateSheetProperties: {
-        properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
-        fields: "gridProperties.frozenRowCount",
+        properties: { sheetId, gridProperties: { frozenRowCount: 1, frozenColumnCount: p.columnasFijas ?? 0 } },
+        fields: "gridProperties(frozenRowCount,frozenColumnCount)",
       },
     },
     {
@@ -88,12 +95,12 @@ function formato(p: Pestana, sheetId: number, esNueva: boolean): unknown[] {
         fields: "userEnteredFormat(textFormat,backgroundColor)",
       },
     },
-    // Sin negrita en los datos (una fila "Total" de antes pudo quedar más arriba o más abajo).
+    // Datos sin formato previo (negritas, colores y formatos de una versión anterior de la pestaña).
     {
       repeatCell: {
         range: { sheetId, startRowIndex: 1 },
-        cell: { userEnteredFormat: { textFormat: { bold: false } } },
-        fields: "userEnteredFormat.textFormat.bold",
+        cell: { userEnteredFormat: { textFormat: { bold: false }, backgroundColor: BLANCO } },
+        fields: "userEnteredFormat(textFormat.bold,backgroundColor,numberFormat)",
       },
     },
   ];
@@ -107,23 +114,36 @@ function formato(p: Pestana, sheetId: number, esNueva: boolean): unknown[] {
       },
     });
   });
-  const ultima = p.filas.length;
-  if (p.filas[ultima - 1]?.[0] === "Total") {
+  for (const fila of p.negritas ?? []) {
     requests.push({
       repeatCell: {
-        range: { sheetId, startRowIndex: ultima, endRowIndex: ultima + 1 },
+        range: { sheetId, startRowIndex: fila + 1, endRowIndex: fila + 2 },
         cell: { userEnteredFormat: { textFormat: { bold: true } } },
         fields: "userEnteredFormat.textFormat.bold",
       },
     });
   }
+  (p.fondos ?? []).forEach((fila, f) => {
+    fila.forEach((color, c) => {
+      if (!color) return;
+      requests.push({
+        repeatCell: {
+          range: { sheetId, startRowIndex: f + 1, endRowIndex: f + 2, startColumnIndex: c, endColumnIndex: c + 1 },
+          cell: { userEnteredFormat: { backgroundColor: color } },
+          fields: "userEnteredFormat.backgroundColor",
+        },
+      });
+    });
+  });
   requests.push({
     autoResizeDimensions: {
       dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: p.columnas.length },
     },
   });
   // El filtro se pone solo al crear la pestaña, para no borrar el que hayas elegido después.
-  if (esNueva) requests.push({ setBasicFilter: { filter: { range: { sheetId } } } });
+  if (p.sinFiltro) {
+    if (hoja.conFiltro) requests.push({ clearBasicFilter: { sheetId } });
+  } else if (esNueva) requests.push({ setBasicFilter: { filter: { range: { sheetId } } } });
   return requests;
 }
 
@@ -170,8 +190,8 @@ export async function sincronizarPlanilla(opciones?: {
   await cliente.escribir(pestanas.map((p, i) => ({ range: rango(p.titulo, "A1"), values: valores(p, i === 0) })));
   await cliente.cambios(
     pestanas.flatMap((p) => {
-      const id = existentes.find((e) => e.titulo === p.titulo)?.id;
-      return id === undefined ? [] : formato(p, id, nuevas.has(p.titulo));
+      const hoja = existentes.find((e) => e.titulo === p.titulo);
+      return hoja ? formato(p, hoja, nuevas.has(p.titulo)) : [];
     }),
   );
   ultimaHuella = huella;

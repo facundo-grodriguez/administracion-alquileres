@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   avisoQueCorresponde,
+  correspondeAlPeriodo,
   cuandoVence,
   existiaEnPeriodo,
   fechaDelPeriodo,
@@ -10,6 +11,7 @@ import {
   periodoPendiente,
   periodoSiguiente,
   tipoGastoDeServicio,
+  ultimoMesAlDarDeBaja,
   vencimientoDelMes,
 } from "../src/core/util/vencimientoServicio.js";
 
@@ -112,5 +114,31 @@ describe("ver meses anteriores", () => {
     expect(existiaEnPeriodo(creado, "2026-12", false)).toBe(true);
     expect(existiaEnPeriodo(creado, "2026-10", false)).toBe(false);
     expect(existiaEnPeriodo(creado, "2026-10", true)).toBe(true);
+  });
+});
+
+describe("último mes de un servicio (v9.11.0)", () => {
+  const creado = new Date(2026, 8, 10); // septiembre 2026
+  it("con última cuota no cuenta después de ese mes", () => {
+    const s = { createdAt: creado, activo: true, hastaPeriodo: "2026-12" };
+    expect(correspondeAlPeriodo(s, "2026-12", false)).toBe(true);
+    expect(correspondeAlPeriodo(s, "2027-01", false)).toBe(false);
+    expect(correspondeAlPeriodo(s, "2026-08", false)).toBe(false); // antes de cargarlo
+  });
+  it("dado de baja: sigue contando hasta su último mes, aunque no esté pagado", () => {
+    const s = { createdAt: creado, activo: false, hastaPeriodo: "2026-10" };
+    expect(correspondeAlPeriodo(s, "2026-09", false)).toBe(true);
+    expect(correspondeAlPeriodo(s, "2026-11", true)).toBe(false);
+  });
+  it("dados de baja antes de v9.11.0: solo los meses con algo cargado", () => {
+    const s = { createdAt: creado, activo: false, hastaPeriodo: null };
+    expect(correspondeAlPeriodo(s, "2026-10", true)).toBe(true);
+    expect(correspondeAlPeriodo(s, "2026-11", false)).toBe(false);
+  });
+  it("al dar de baja queda este mes si ya se pagó, si no el anterior", () => {
+    expect(ultimoMesAlDarDeBaja("2026-11-06", true, null)).toBe("2026-11");
+    expect(ultimoMesAlDarDeBaja("2026-11-06", false, null)).toBe("2026-10");
+    expect(ultimoMesAlDarDeBaja("2027-01-06", false, null)).toBe("2026-12");
+    expect(ultimoMesAlDarDeBaja("2027-03-06", true, "2026-12")).toBe("2026-12"); // ya había terminado
   });
 });
