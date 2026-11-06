@@ -9,6 +9,8 @@ import { historialPagos, type PeriodoHistorial } from "../services/pagos.service
 import * as serviciosService from "../services/serviciosVencimiento.service.js";
 import { formatoPeriodoAR, hoyISO } from "../util/fecha.js";
 import { entraEnBalance } from "../util/responsableGasto.js";
+import { nombreRubro } from "../util/rubroGasto.js";
+import { tipoGastoDeServicio } from "../util/vencimientoServicio.js";
 
 /** Texto, número o fecha ISO (YYYY-MM-DD); null = celda vacía. */
 export type Celda = string | number | null;
@@ -41,20 +43,6 @@ export const PESTANAS = {
   gastos: "Gastos propiedades",
   personales: "Servicios personales",
 } as const;
-
-const RUBROS: Record<string, string> = {
-  expensas: "Expensas",
-  ABL: "ABL",
-  ARBA: "ARBA",
-  luz: "Luz",
-  gas: "Gas",
-  agua: "Agua",
-  internet: "Internet",
-  seguro_hogar: "Seguro hogar",
-  seguro_incendio: "Seguro incendio",
-  reparacion: "Arreglo",
-  otro: "Otro",
-};
 
 const ESTADO_PAGO: Record<string, string> = {
   pagado: "Pagado",
@@ -107,8 +95,36 @@ async function alquileres(contratos: Contrato[], historiales: Map<string, Period
   };
 }
 
-async function gastos(): Promise<Pestana> {
+/**
+ * Gastos de las propiedades, del más nuevo al más viejo. Suma los vencimientos de servicios de
+ * propiedades que todavía no se pagaron (v9.12.0): así lo que falta pagar está todo junto.
+ */
+async function gastos(hoy: string): Promise<Pestana> {
   const todos = await gastosRepo.listarTodos();
+  const servicios = (await serviciosService.paraPagar(hoy)).filter((v) => v.propiedadId && !v.gastoId);
+  const filasGastos: Celda[][] = todos.map((g) => [
+    g.fechaVencimiento,
+    g.propiedad.direccion,
+    nombreRubro(g.tipo),
+    g.observaciones,
+    g.responsable === "inquilino" ? "Inquilino" : g.responsable === "propietario" ? "Propietario" : null,
+    num(g.monto),
+    g.fechaPago ? "Pagado" : "Pendiente",
+    g.fechaPago,
+    entraEnBalance(g) ? "Sí" : "No",
+  ]);
+  const filasServicios: Celda[][] = servicios.map((v) => [
+    v.fechaVencimiento,
+    v.propiedad,
+    nombreRubro(tipoGastoDeServicio(v.nombre)),
+    `${v.nombre} de ${formatoPeriodoAR(v.periodo)} (vencimiento, monto aprox.)`,
+    null,
+    num(v.monto),
+    v.fechaVencimiento < hoy ? "Vencido" : "Pendiente",
+    null,
+    "Al pagarlo",
+  ]);
+  const filas = [...filasServicios, ...filasGastos].sort((a, b) => String(b[0]).localeCompare(String(a[0])));
   return {
     titulo: PESTANAS.gastos,
     columnas: [
@@ -122,17 +138,7 @@ async function gastos(): Promise<Pestana> {
       { titulo: "Pagado el", tipo: "fecha" },
       { titulo: "Resta del balance" },
     ],
-    filas: todos.map((g) => [
-      g.fechaVencimiento,
-      g.propiedad.direccion,
-      RUBROS[g.tipo] ?? g.tipo,
-      g.observaciones,
-      g.responsable === "inquilino" ? "Inquilino" : g.responsable === "propietario" ? "Propietario" : null,
-      num(g.monto),
-      g.fechaPago ? "Pagado" : "Pendiente",
-      g.fechaPago,
-      entraEnBalance(g) ? "Sí" : "No",
-    ]),
+    filas,
   };
 }
 
@@ -278,7 +284,7 @@ export async function armarPlanilla(hoy = hoyISO()): Promise<Pestana[]> {
   return [
     await resumen(contratos, historiales, hoy),
     await alquileres(contratos, historiales),
-    await gastos(),
+    await gastos(hoy),
     await personales(hoy),
   ];
 }

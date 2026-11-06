@@ -7,7 +7,7 @@ import * as serviciosRepo from "../../repositories/serviciosVencimiento.reposito
 import * as serviciosService from "../../services/serviciosVencimiento.service.js";
 import { formatoFechaAR, formatoPeriodoAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
-import { DIAS_AVISO_PREVIO, nombreServicio, SERVICIOS } from "../../util/vencimientoServicio.js";
+import { nombreServicio, SERVICIOS } from "../../util/vencimientoServicio.js";
 import { buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
 import { type CandidatoFlujo, type DatosFlujo, type DefinicionFlujo, etiquetaKey } from "../types.js";
 
@@ -89,7 +89,7 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
           datos.monto ? `Monto aprox.: ${formatoARS(datos.monto as string)}` : null,
           datos.termina === "mes" ? `Última cuota: ${formatoPeriodoAR(datos.hasta as string)}` : null,
           "",
-          `Te aviso ${DIAS_AVISO_PREVIO} días antes y el mismo día, hasta que lo marques como pagado.`,
+          "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
         ]
           .filter((l) => l !== null)
           .join("\n"),
@@ -121,8 +121,20 @@ export function etiquetaPagoServicio(v: VencimientoServicio): string {
   return `🕓 ${nombreServicio(v.nombre, v.propiedad)} — ${formatoFechaAR(v.fechaVencimiento)}${v.monto ? ` — ${formatoARS(v.monto)}` : ""}`;
 }
 
+/** En "✅ Pagar" (gastos y servicios juntos) el servicio elegido viene como "sv:<ref>". */
+export const PREFIJO_PAGO_SERVICIO = "sv:";
+
+/** La referencia del servicio a pagar: del flujo de servicios o de "✅ Pagar". */
+function refPago(datos: DatosFlujo): string {
+  if (datos.vencimiento !== undefined) return String(datos.vencimiento);
+  const elegido = String(datos.gasto_id ?? "");
+  return elegido.startsWith(PREFIJO_PAGO_SERVICIO) ? elegido.slice(PREFIJO_PAGO_SERVICIO.length) : "";
+}
+
+export const esPagoDeServicio = (datos: DatosFlujo) => refPago(datos) !== "";
+
 export function infoPagoServicio(datos: DatosFlujo) {
-  const [servicioId = "", periodo, propiedad, alquilada, monto] = String(datos.vencimiento ?? "").split(SEP);
+  const [servicioId = "", periodo, propiedad, alquilada, monto] = refPago(datos).split(SEP);
   return {
     servicioId,
     periodo: periodo || undefined,
@@ -203,7 +215,7 @@ export const pagarServicioFlow: DefinicionFlujo = {
         return [
           "Confirmá el pago:",
           "",
-          String(datos[etiquetaKey("vencimiento")])
+          String(datos[etiquetaKey("vencimiento")] ?? datos[etiquetaKey("gasto_id")])
             .replace(/^🕓 /, "")
             .replace(/ — \$[^—]*$/, ""), // sin el monto aprox.
           `Pagado el ${formatoFechaAR(datos.fecha_pago as string)}`,

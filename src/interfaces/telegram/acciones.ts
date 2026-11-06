@@ -4,13 +4,14 @@
 // excepción es "⚡ IPC", que sigue pasando por el asistente (calcula con la API de IPC).
 //
 // callback_data: "accion:<nombre>" o "accion:<nombre>:c:<contratoId>" / "accion:<nombre>:p:<propiedadId>".
+
 import { InlineKeyboard } from "grammy";
 import { detalleContratoTexto } from "../../core/assistant/tools/consultarContrato.tool.js";
 import type { DatosFlujo, FlowId, ReferenciaEntidad } from "../../core/flows/types.js";
 import { etiquetaKey } from "../../core/flows/types.js";
 import * as contratosRepo from "../../core/repositories/contratos.repository.js";
-import * as gastosRepo from "../../core/repositories/gastosPropiedad.repository.js";
 import * as propiedadesRepo from "../../core/repositories/propiedades.repository.js";
+import { sinPagar } from "../../core/services/sinPagar.service.js";
 import { formatoFechaAR } from "../../core/util/fecha.js";
 import { construirInlineKeyboard } from "./keyboards.js";
 
@@ -75,7 +76,12 @@ async function detallePropiedad(ctx: Contexto): Promise<ResultadoAccion> {
   }
   const p = ctx.propiedad;
   const conPropietario = await propiedadesRepo.obtenerConPropietario(p.id);
-  const pendientes = (await gastosRepo.listarPendientes()).filter((g) => g.propiedadId === p.id);
+  // Gastos cargados y vencimientos de servicios de la propiedad, todo lo que falta pagar.
+  const deuda = await sinPagar();
+  const pendientes = [
+    ...deuda.gastos.filter((g) => g.propiedadId === p.id),
+    ...deuda.servicios.filter((v) => v.propiedadId === p.id),
+  ];
   const texto = [
     `🏠 ${p.direccion}`,
     p.zona ? `Zona: ${p.zona}` : null,

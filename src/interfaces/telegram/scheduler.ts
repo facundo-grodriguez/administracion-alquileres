@@ -1,4 +1,4 @@
-import type { Bot } from "grammy";
+import { type Bot, InlineKeyboard } from "grammy";
 import { schedule } from "node-cron";
 import { env } from "../../config/env.js";
 import { programarSincronizacion } from "../../core/planilla/sincronizarPlanilla.js";
@@ -8,8 +8,8 @@ import {
   hayActualizacionesVencidas,
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
+import { sinPagar } from "../../core/services/sinPagar.service.js";
 import { hoyISO } from "../../core/util/fecha.js";
-import { enviarAvisosServicios } from "./avisosServicios.js";
 import { TEXTO_AYUDA_ALQUILER_ACTUAL, tecladoAlquilerActual } from "./flowKeyboards.js";
 import { dividirMensaje } from "./util.js";
 
@@ -34,12 +34,20 @@ export async function enviarDigestDiario(
 
   const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
   const texto = formatearResumenAgenda(resumen);
+  // Un solo mensaje con todo (v9.12.0): abajo, el botón para pagar lo que falte.
+  const deuda = await sinPagar(hoy);
+  const teclado =
+    deuda.gastos.length + deuda.servicios.length > 0
+      ? new InlineKeyboard().text("✅ Pagar", "flujo:iniciar:pagar_gasto").text("💡 Ver sin pagar", "cq:gastos")
+      : undefined;
 
   let algunEnvioExitoso = false;
   for (const chatId of destinos) {
     try {
-      for (const parte of dividirMensaje(texto)) {
-        await bot.api.sendMessage(chatId, parte);
+      const partes = dividirMensaje(texto);
+      for (const [i, parte] of partes.entries()) {
+        const ultima = i === partes.length - 1;
+        await bot.api.sendMessage(chatId, parte, ultima && teclado ? { reply_markup: teclado } : {});
       }
       if (hayActualizacionesVencidas(resumen)) {
         await bot.api.sendMessage(chatId, TEXTO_AYUDA_ALQUILER_ACTUAL, { reply_markup: tecladoAlquilerActual() });
@@ -71,7 +79,7 @@ export const yaEsHora = (hora: string, horaAgenda: string) => hora >= horaAgenda
 let enCurso = false;
 
 /**
- * La agenda del día y los avisos de servicios. No repite nada: lo ya mandado hoy queda registrado
+ * La agenda del día (con los vencimientos de servicios adentro). No repite nada: lo ya mandado hoy queda registrado
  * en la base, así que se puede llamar muchas veces.
  */
 async function tareaDiaria(bot: Bot, destinos: number[]): Promise<void> {
@@ -82,12 +90,9 @@ async function tareaDiaria(bot: Bot, destinos: number[]): Promise<void> {
       console.error("Falló la agenda diaria:", error);
       return false;
     });
-    const avisos = await enviarAvisosServicios(bot, destinos).catch((error: unknown) => {
-      console.error("Fallaron los avisos de servicios:", error);
-      return 0;
-    });
-    if (digest || avisos > 0) {
-      console.log(`Recordatorio diario: agenda ${digest ? "enviada" : "ya estaba"}, ${avisos} aviso(s) de servicios.`);
+    // Los vencimientos van todos en la agenda: ya no se manda un mensaje por cada uno (v9.12.0).
+    if (digest) {
+      console.log("Recordatorio diario: agenda enviada.");
       // Con el cambio de día hay meses que pasan a "atrasado"/"vencido": se refleja en la planilla.
       programarSincronizacion(1_000);
     }
@@ -97,8 +102,8 @@ async function tareaDiaria(bot: Bot, destinos: number[]): Promise<void> {
 }
 
 /**
- * Programa el recordatorio diario (AGENDA_HORA, AGENDA_TIMEZONE): primero la agenda y después un
- * mensaje por cada servicio que vence en 3 días o hoy (con botones).
+ * Programa el recordatorio diario (AGENDA_HORA, AGENDA_TIMEZONE): un solo mensaje con la agenda,
+ * que incluye los vencimientos de servicios, y el botón para pagar.
  *
  * En el plan gratis de Render el bot se duerme si nadie le escribe, y a la hora justa puede estar
  * dormido. Por eso no depende de un único disparo: al arrancar y cada 10 minutos revisa si ya pasó

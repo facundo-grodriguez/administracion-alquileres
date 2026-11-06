@@ -5,7 +5,8 @@ import { serviciosVencimiento, serviciosVencimientoMes } from "../db/schema.js";
 export type ServicioVencimiento = typeof serviciosVencimiento.$inferSelect;
 export type MesServicio = typeof serviciosVencimientoMes.$inferSelect;
 
-const conDetalle = { propiedad: true, meses: true } as const;
+// Cada mes trae el gasto de la propiedad vinculado (v9.12.0): si se pagó como gasto, el mes queda pagado.
+const conDetalle = { propiedad: true, meses: { with: { gasto: true } } } as const;
 
 export async function crear(datos: {
   nombre: string;

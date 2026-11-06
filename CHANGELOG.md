@@ -2,6 +2,27 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.12.0] — 2026-11-06 — Gastos y vencimientos conectados
+> 💡 "Gastos sin pagar" junta todo: gastos cargados y vencimientos del mes, por Personal y cada propiedad
+> ✅ Un solo botón "Pagar" para gastos y servicios
+> 🔗 Sin duplicados: cargar a mano la luz del mes la vincula al vencimiento de esa propiedad
+> 📅 La agenda de la mañana es el único aviso: ya no llega un mensaje por cada vencimiento
+
+"💡 Gastos sin pagar" (Consultas, la ficha de la propiedad y la tool nueva `listar_sin_pagar`) muestra
+los gastos de propiedades sin pagar y los vencimientos de servicios de este mes y los próximos 10 días,
+en 👤 Personal y 🏠 cada propiedad con subtotales. "✅ Pagar" (`pagar_gasto`) ofrece las dos cosas: si
+es un servicio sigue los pasos de "Pagar servicio" (monto real y, si está alquilada, quién pagó).
+
+Al cargar un gasto de un rubro que la propiedad tiene agendado como vencimiento (luz, gas, agua,
+expensas, ABL...), el mes del vencimiento queda vinculado al gasto: cuando se paga el gasto, el
+vencimiento queda pagado (no avisa más) y en "sin pagar" aparece una sola vez. Si ese mes ya estaba
+pagado desde el vencimiento, avisa que puede estar duplicado. La planilla suma a "Gastos propiedades"
+los vencimientos de propiedades que faltan pagar.
+
+El recordatorio diario manda un solo mensaje: la agenda, que ya lista los vencimientos de servicios,
+ahora con el monto, ⚠️ en lo que vence hoy o está atrasado, la fecha en DD/MM/AAAA y los botones
+"✅ Pagar" y "💡 Ver sin pagar". Se dejan de mandar los avisos sueltos de cada servicio.
+
 ## [9.11.1] — 2026-11-06 — Los avisos llegan aunque el bot esté dormido
 > 🔔 La agenda y los avisos de servicios salen apenas el bot se despierta, si a las 9 estaba dormido
 > 🕘 El bot usa la hora de Argentina: de 21 a 24 hs ya no cree que es el día siguiente

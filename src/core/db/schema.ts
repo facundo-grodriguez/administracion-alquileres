@@ -374,4 +374,5 @@ export const serviciosVencimientoMesRelations = relations(serviciosVencimientoMe
     fields: [serviciosVencimientoMes.servicioId],
     references: [serviciosVencimiento.id],
   }),
+  gasto: one(gastosPropiedad, { fields: [serviciosVencimientoMes.gastoId], references: [gastosPropiedad.id] }),
 }));

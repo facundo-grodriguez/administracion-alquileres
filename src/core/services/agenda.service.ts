@@ -41,10 +41,10 @@ export function formatearResumenAgenda(resumen: ResumenAgenda): string {
   const { cobrosPendientes, vencimientos } = resumen;
 
   if (cobrosPendientes.length === 0 && vencimientos.length === 0) {
-    return `📅 Agenda (${hoyISO()})\n\nNo hay nada pendiente. Todo al día. ✅`;
+    return `📅 Agenda (${formatoFechaAR(hoyISO())})\n\nNo hay nada pendiente. Todo al día. ✅`;
   }
 
-  const bloques: string[] = [`📅 Agenda (${hoyISO()})`];
+  const bloques: string[] = [`📅 Agenda (${formatoFechaAR(hoyISO())})`];
 
   if (cobrosPendientes.length > 0) {
     const lineas = cobrosPendientes.map((c) => {
@@ -57,7 +57,7 @@ export function formatearResumenAgenda(resumen: ResumenAgenda): string {
   if (vencimientos.length > 0) {
     const lineas = vencimientos.map(
       (v) =>
-        `  • ${v.descripcion} — ${v.propiedad} — ${formatoFechaAR(v.fechaVencimiento)} (${diasTexto(v.diasRestantes)})`,
+        `  • ${v.descripcion} — ${v.propiedad} — ${formatoFechaAR(v.fechaVencimiento)} (${v.diasRestantes <= 0 ? "⚠️ " : ""}${diasTexto(v.diasRestantes)})${v.monto ? ` — ${formatoARS(v.monto)}` : ""}`,
     );
     bloques.push(`⏰ Vencimientos próximos (${vencimientos.length}):\n${lineas.join("\n")}`);
   }

@@ -16,6 +16,7 @@ import { crearReciboTool } from "./crearRecibo.tool.js";
 import { crearVencimientoServicioTool } from "./crearVencimientoServicio.tool.js";
 import { historialPagosTool } from "./historialPagos.tool.js";
 import { listarGastosTool } from "./listarGastos.tool.js";
+import { listarSinPagarTool } from "./listarSinPagar.tool.js";
 import { listarVencimientosTool } from "./listarVencimientos.tool.js";
 import { listarVencimientosServiciosTool } from "./listarVencimientosServicios.tool.js";
 import { marcarGastoPagadoTool } from "./marcarGastoPagado.tool.js";
@@ -35,6 +36,7 @@ export const tools = [
   obtenerAgendaTool,
   listarVencimientosTool,
   listarGastosTool,
+  listarSinPagarTool,
   obtenerBalanceFinancieroTool,
   consultarGarantesTool,
   consultarContratoTool,

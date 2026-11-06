@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as gastosRepo from "../../repositories/gastosPropiedad.repository.js";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import * as gastosService from "../../services/gastosPropiedad.service.js";
+import * as serviciosService from "../../services/serviciosVencimiento.service.js";
 import { formatoFechaAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { entraEnBalance, responsablePorDefecto } from "../../util/responsableGasto.js";
@@ -14,7 +15,8 @@ export const crearGastoTool = defineTool({
     "seguro hogar, arreglo/reparación (ej: plomero, electricista), u otro. Es el mismo lugar para cualquier gasto, no importa el rubro. " +
     "Requiere el ID de la propiedad (usar buscar_propiedad primero). Si el gasto ya está pagado, pasar " +
     "fecha_pago (y monto) para que entre directo en el balance. Los servicios, expensas, impuestos y seguro los paga el inquilino " +
-    "(no restan en el balance); para arreglos y 'otro' preguntá quién paga.",
+    "(no restan en el balance); para arreglos y 'otro' preguntá quién paga. Si la propiedad tiene agendado el " +
+    "vencimiento de ese servicio, el gasto se vincula solo a ese mes (no queda duplicado).",
   inputSchema: z.object({
     propiedad_id: z.string(),
     tipo: z.enum(["expensas", "ABL", "ARBA", "luz", "gas", "agua", "internet", "seguro_hogar", "reparacion", "otro"]),
@@ -41,6 +43,7 @@ export const crearGastoTool = defineTool({
     const pagado = input.fecha_pago
       ? await gastosService.marcarPagado({ gastoId: gasto.id, fechaPago: input.fecha_pago })
       : undefined;
+    const vinculo = await serviciosService.vincularGasto(gasto);
     const propiedad = await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id);
     return [
       "Gasto registrado.",
@@ -56,6 +59,7 @@ export const crearGastoTool = defineTool({
         : pagado?.fechaPago
           ? `Pagado el ${formatoFechaAR(pagado.fechaPago)}${gasto.monto ? " — ya figura en el balance." : " — sin monto, no entra en el balance."}`
           : "Pendiente de pago: entra en el balance cuando lo marques como pagado.",
+      vinculo ? serviciosService.textoVinculo(vinculo) : null,
       `(id: ${gasto.id})`,
     ]
       .filter(Boolean)

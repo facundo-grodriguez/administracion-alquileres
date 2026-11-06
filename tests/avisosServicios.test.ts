@@ -56,7 +56,7 @@ describe("flujo de alta de vencimiento", () => {
     });
     expect(texto).toContain("⚡ Luz (Personal)");
     expect(texto).toContain("día 15 de cada mes");
-    expect(texto).toContain("3 días antes");
+    expect(texto).toContain("agenda de cada mañana");
   });
 });
 

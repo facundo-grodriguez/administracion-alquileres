@@ -1,13 +1,21 @@
 // Flujos guiados para gastos ya cargados: marcarlos como pagados y corregirlos.
 import * as gastosRepo from "../../repositories/gastosPropiedad.repository.js";
 import * as gastosService from "../../services/gastosPropiedad.service.js";
+import { sinPagar } from "../../services/sinPagar.service.js";
 import { formatoFechaAR, formatoPeriodoAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { entraEnBalance, hayQueElegirResponsable, type Responsable } from "../../util/responsableGasto.js";
 import { buscarPropiedadesParaFlujo } from "../entidadHelpers.js";
-import { type CandidatoFlujo, type DatosFlujo, type DefinicionFlujo, etiquetaKey } from "../types.js";
+import { type CandidatoFlujo, type DatosFlujo, type DefinicionFlujo, etiquetaKey, type PasoFlujo } from "../types.js";
 import { parsePeriodoUsuario } from "../validadores.js";
 import { RESPONSABLES, TIPOS_GASTO } from "./crearGasto.flow.js";
+import {
+  esPagoDeServicio,
+  etiquetaPagoServicio,
+  idPagoServicio,
+  PREFIJO_PAGO_SERVICIO,
+  pagarServicioFlow,
+} from "./serviciosVencimiento.flow.js";
 
 const MANTENER = "mantener";
 const etiquetaTipo = (valor: unknown) => TIPOS_GASTO.find((t) => t.valor === valor)?.etiqueta ?? String(valor);
@@ -18,13 +26,6 @@ function etiquetaGasto(g: GastoConPropiedad): string {
   const monto = g.monto ? ` — ${formatoARS(g.monto)}` : "";
   const estado = g.fechaPago ? "✅" : "🕓";
   return `${estado} ${g.tipo} — ${g.propiedad.direccion} — ${formatoFechaAR(g.fechaVencimiento)}${monto}`;
-}
-
-function filtrar(gastos: GastoConPropiedad[], query: string): CandidatoFlujo[] {
-  const q = query.trim().toLowerCase();
-  return gastos
-    .filter((g) => !q || g.tipo.toLowerCase().includes(q) || g.propiedad.direccion.toLowerCase().includes(q))
-    .map((g) => ({ id: g.id, etiqueta: etiquetaGasto(g) }));
 }
 
 /** Meses (YYYY-MM, del más nuevo al más viejo) que tienen gastos en la propiedad elegida. */
@@ -60,38 +61,77 @@ async function buscarGastosDelMes(query: string, datos: DatosFlujo): Promise<Can
     }));
 }
 
+/** Lo que se puede pagar: gastos cargados sin pagar y vencimientos de servicios del mes (v9.12.0). */
+async function buscarParaPagar(query: string): Promise<CandidatoFlujo[]> {
+  const { gastos, servicios } = await sinPagar();
+  const candidatos = [
+    ...gastos.map((g) => ({ id: g.id, etiqueta: etiquetaGasto(g) })),
+    ...(await Promise.all(
+      servicios.map(async (v) => ({
+        id: `${PREFIJO_PAGO_SERVICIO}${await idPagoServicio(v)}`,
+        etiqueta: etiquetaPagoServicio(v),
+      })),
+    )),
+  ];
+  const q = query.trim().toLowerCase();
+  return candidatos.filter((c) => !q || c.etiqueta.toLowerCase().includes(q));
+}
+
+/** Un paso del pago de servicios, que solo corre si lo elegido es un servicio. */
+function pasoDeServicio(id: string): PasoFlujo {
+  const paso = pagarServicioFlow.pasos.find((p) => p.id === id)!;
+  return { ...paso, saltar: (d) => !esPagoDeServicio(d) || (paso.saltar?.(d) ?? false) };
+}
+
+const pasoMontoServicio = pagarServicioFlow.pasos.find((p) => p.id === "monto")!;
+const confirmarServicio = pagarServicioFlow.pasos.find((p) => p.id === "__confirmar")!;
+
+/**
+ * "✅ Pagar": un solo lugar para pagar un gasto cargado o un vencimiento de servicio. Si es un
+ * servicio, sigue los mismos pasos que "Pagar servicio" (monto real y, si está alquilada, quién pagó).
+ */
 export const pagarGastoFlow: DefinicionFlujo = {
   id: "pagar_gasto",
-  titulo: "✅ Pagar gasto",
+  titulo: "✅ Pagar",
   etiqueta: (datos) => datos[etiquetaKey("gasto_id")] as string,
   pasos: [
     {
       id: "gasto_id",
-      pregunta: () => "¿Qué gasto se pagó? Elegí uno de la lista o escribí el tipo o la dirección para buscar.",
-      campo: { tipo: "entidad", buscar: async (q) => filtrar(await gastosRepo.listarPendientes(), q) },
+      pregunta: () => "¿Qué pagaste? Elegí de la lista o escribí el nombre o la dirección para buscar.",
+      campo: { tipo: "entidad", buscar: buscarParaPagar },
     },
     { id: "fecha_pago", pregunta: () => "¿Fecha de pago?", campo: { tipo: "fecha", permitirHoy: true } },
+    pasoDeServicio("usar_aprox"),
     {
       id: "monto",
-      pregunta: () => "¿Cuánto se pagó? Si es el monto que ya estaba cargado, tocá Omitir.",
+      pregunta: (datos) =>
+        esPagoDeServicio(datos)
+          ? pasoMontoServicio.pregunta(datos)
+          : "¿Cuánto se pagó? Si es el monto que ya estaba cargado, tocá Omitir.",
       campo: { tipo: "monto", opcional: true },
+      saltar: (d) => esPagoDeServicio(d) && (pasoMontoServicio.saltar?.(d) ?? false),
     },
+    pasoDeServicio("monto_real"),
+    pasoDeServicio("responsable"),
     {
       id: "__confirmar",
       pregunta: (datos) =>
-        [
-          "Confirmá el pago del gasto:",
-          "",
-          `Gasto: ${datos[etiquetaKey("gasto_id")]}`,
-          `Fecha de pago: ${formatoFechaAR(datos.fecha_pago as string)}`,
-          datos.monto ? `Monto pagado: ${formatoARS(datos.monto as string)}` : null,
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        esPagoDeServicio(datos)
+          ? confirmarServicio.pregunta(datos)
+          : [
+              "Confirmá el pago del gasto:",
+              "",
+              `Gasto: ${datos[etiquetaKey("gasto_id")]}`,
+              `Fecha de pago: ${formatoFechaAR(datos.fecha_pago as string)}`,
+              datos.monto ? `Monto pagado: ${formatoARS(datos.monto as string)}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
       campo: { tipo: "confirmacion" },
     },
   ],
   ejecutar: async (datos) => {
+    if (esPagoDeServicio(datos)) return pagarServicioFlow.ejecutar(datos);
     const gasto = await gastosService.marcarPagado({
       gastoId: datos.gasto_id as string,
       fechaPago: datos.fecha_pago as string,

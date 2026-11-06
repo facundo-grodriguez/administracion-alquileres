@@ -1,6 +1,7 @@
 // Menú "🔎 Consultas": junta en un solo lugar todo lo que se puede consultar, con botones, y lo
 // resuelve directo contra el backend — sin pasar por OpenAI. Callback_data: "cq:<op>" para las
 // consultas generales y "cq:<op>:<contratoId>" para las de un contrato puntual.
+
 import { InlineKeyboard } from "grammy";
 import { detalleContratoTexto } from "../../core/assistant/tools/consultarContrato.tool.js";
 import { historialPagosTexto } from "../../core/assistant/tools/historialPagos.tool.js";
@@ -11,8 +12,9 @@ import * as propiedadesRepo from "../../core/repositories/propiedades.repository
 import * as movimientosService from "../../core/services/movimientos.service.js";
 import * as pagosService from "../../core/services/pagos.service.js";
 import * as serviciosService from "../../core/services/serviciosVencimiento.service.js";
+import { sinPagar, textoSinPagar } from "../../core/services/sinPagar.service.js";
 import * as vencimientosService from "../../core/services/vencimientos.service.js";
-import { diasEntreISO, formatoFechaAR, formatoPeriodoAR, hoyISO, sumarDiasISO } from "../../core/util/fecha.js";
+import { formatoFechaAR, formatoPeriodoAR, hoyISO, sumarDiasISO } from "../../core/util/fecha.js";
 import { formatoARS } from "../../core/util/formato.js";
 import { entraEnBalance } from "../../core/util/responsableGasto.js";
 import { periodoAnterior, periodoSiguiente } from "../../core/util/vencimientoServicio.js";
@@ -174,15 +176,14 @@ async function vencimientosTexto(tipo?: "actualizacion_alquiler"): Promise<Respu
   };
 }
 
-async function gastosPendientesTexto(): Promise<string> {
-  const gastos = await gastosRepo.listarPendientes();
-  if (gastos.length === 0) return "No hay gastos sin pagar. ✅";
+/** Todo lo que falta pagar: gastos cargados y vencimientos del mes, con un solo botón de Pagar. */
+async function gastosSinPagar(): Promise<RespuestaConsulta> {
   const hoy = hoyISO();
-  const lineas = gastos.map(
-    (g) =>
-      `• ${g.tipo} — ${g.propiedad.direccion} — vence ${formatoFechaAR(g.fechaVencimiento)} (${diasTexto(diasEntreISO(hoy, g.fechaVencimiento))})${g.monto ? ` — ${formatoARS(g.monto)}` : ""}${g.responsable ? ` — paga: ${g.responsable}` : ""}`,
-  );
-  return `💡 Gastos sin pagar (${gastos.length}):\n\n${lineas.join("\n")}`;
+  const deuda = await sinPagar(hoy);
+  const teclado = new InlineKeyboard();
+  if (deuda.gastos.length + deuda.servicios.length > 0) teclado.text("✅ Pagar", "flujo:iniciar:pagar_gasto");
+  teclado.text("➕ Cargar gasto", "flujo:iniciar:crear_gasto").row();
+  return { texto: textoSinPagar(deuda, hoy), teclado: botonOtraConsulta(teclado) };
 }
 
 const FILTROS: { valor: serviciosService.FiltroServicios; corto: string; texto: string }[] = [
@@ -270,7 +271,7 @@ export async function responderConsulta(datos: string): Promise<RespuestaConsult
     case "ipc":
       return vencimientosTexto("actualizacion_alquiler");
     case "gastos":
-      return { texto: await gastosPendientesTexto(), teclado: botonOtraConsulta() };
+      return gastosSinPagar();
     default:
       return { texto: "¿Qué querés consultar?", teclado: tecladoConsultas() };
   }

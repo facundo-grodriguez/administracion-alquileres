@@ -3,7 +3,7 @@ import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import * as serviciosService from "../../services/serviciosVencimiento.service.js";
 import { formatoFechaAR, formatoPeriodoAR } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
-import { DIAS_AVISO_PREVIO, nombreServicio } from "../../util/vencimientoServicio.js";
+import { nombreServicio } from "../../util/vencimientoServicio.js";
 import { defineTool } from "../defineTool.js";
 
 export const crearVencimientoServicioTool = defineTool({
@@ -42,7 +42,7 @@ export const crearVencimientoServicioTool = defineTool({
       `Próximo: ${formatoFechaAR(v.fechaVencimiento)}`,
       v.monto ? `Monto aprox.: ${formatoARS(v.monto)}` : null,
       v.hastaPeriodo ? `Última cuota: ${formatoPeriodoAR(v.hastaPeriodo)}` : null,
-      `Te aviso ${DIAS_AVISO_PREVIO} días antes y el mismo día, hasta que lo marques como pagado.`,
+      "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
       `(id: ${v.servicioId})`,
     ]
       .filter((l) => l !== null)

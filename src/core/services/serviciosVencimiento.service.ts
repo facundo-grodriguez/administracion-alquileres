@@ -55,8 +55,9 @@ function armar(servicio: ServicioConDetalle, periodo: string, hoy: string): Venc
     diaVencimiento: servicio.diaVencimiento,
     periodo,
     fechaVencimiento,
-    fechaPago: mes?.fechaPago ?? null,
-    monto: mes?.monto ?? servicio.monto,
+    // Si el mes está vinculado a un gasto de la propiedad, lo que se pagó ahí cuenta acá (v9.12.0).
+    fechaPago: mes?.fechaPago ?? mes?.gasto?.fechaPago ?? null,
+    monto: mes?.monto ?? mes?.gasto?.monto ?? servicio.monto,
     gastoId: mes?.gastoId ?? null,
     diasRestantes: diasEntreISO(hoy, fechaVencimiento),
     hastaPeriodo: servicio.hastaPeriodo,
@@ -236,6 +237,43 @@ export async function marcarPagado(
   if (!v) return undefined;
   const gasto = await sincronizarGasto(v, responsableDelPago(responsable));
   return { ...v, gastoId: gasto?.id ?? v.gastoId, gasto };
+}
+
+/** Resultado de vincular un gasto cargado a mano con el vencimiento del mismo servicio. */
+export type Vinculo = { nombre: string; periodo: string; yaEstaba: boolean };
+
+/**
+ * Sin duplicados (v9.12.0): si se carga a mano un gasto de una propiedad (ej. Luz de Cerrito de
+ * noviembre) y esa propiedad tiene agendado el vencimiento de ese servicio, el mes del vencimiento
+ * queda vinculado al gasto: cuenta como pagado cuando se paga el gasto, y no aparece dos veces en
+ * "sin pagar". Si ese mes ya tenía otro gasto (se pagó desde el vencimiento), avisa `yaEstaba`.
+ * Los gastos "otro" y los arreglos no se vinculan.
+ */
+export async function vincularGasto(gasto: {
+  id: string;
+  propiedadId: string;
+  tipo: string;
+  fechaVencimiento: string;
+}): Promise<Vinculo | undefined> {
+  if (gasto.tipo === "otro" || gasto.tipo === "reparacion") return undefined;
+  const periodo = gasto.fechaVencimiento.slice(0, 7);
+  const servicio = (await serviciosRepo.listarActivos()).find(
+    (s) =>
+      s.propiedadId === gasto.propiedadId && tipoGastoDeServicio(s.nombre) === gasto.tipo && !terminado(s, periodo),
+  );
+  if (!servicio) return undefined;
+  const mes = servicio.meses.find((m) => m.periodo === periodo);
+  if (mes?.gastoId && mes.gastoId !== gasto.id) return { nombre: servicio.nombre, periodo, yaEstaba: true };
+  await serviciosRepo.guardarMes(servicio.id, periodo, { gastoId: gasto.id });
+  return { nombre: servicio.nombre, periodo, yaEstaba: false };
+}
+
+/** Texto para la respuesta al cargar un gasto vinculado. */
+export function textoVinculo(v: Vinculo): string {
+  const cual = `${iconoServicio(v.nombre)} ${v.nombre} de ${formatoPeriodoAR(v.periodo)}`;
+  return v.yaEstaba
+    ? `⚠️ Ojo: ${cual} ya estaba cargado desde el vencimiento. Si es el mismo pago, corregí o borrá uno de los dos.`
+    : `🔗 Es ${cual} del vencimiento agendado: quedan vinculados y no figura dos veces.`;
 }
 
 export async function cambiarFechaDelMes(servicioId: string, periodo: string, fecha: string) {
