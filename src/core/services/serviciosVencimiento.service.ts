@@ -11,6 +11,8 @@ import type { Responsable } from "../util/responsableGasto.js";
 import {
   avisoQueCorresponde,
   cuandoVence,
+  existiaEnPeriodo,
+  iconoServicio,
   nombreServicio,
   periodoPendiente,
   periodoSiguiente,
@@ -59,10 +61,19 @@ function armar(servicio: ServicioConDetalle, periodo: string, hoy: string): Venc
 const porFecha = (a: VencimientoServicio, b: VencimientoServicio) =>
   a.fechaVencimiento.localeCompare(b.fechaVencimiento) || a.nombre.localeCompare(b.nombre);
 
-/** Todos los servicios activos en un mes (pagados o no), ordenados por fecha. */
+/** Todos los servicios activos en un mes (pagados o no), ordenados por fecha. Los cargados después de ese mes no aparecen. */
 export async function delMes(periodo?: string, hoy = hoyISO()): Promise<VencimientoServicio[]> {
   const p = periodo ?? hoy.slice(0, 7);
-  return (await serviciosRepo.listarActivos()).map((s) => armar(s, p, hoy)).sort(porFecha);
+  return (await serviciosRepo.listarActivos())
+    .filter((s) =>
+      existiaEnPeriodo(
+        s.createdAt,
+        p,
+        s.meses.some((m) => m.periodo === p),
+      ),
+    )
+    .map((s) => armar(s, p, hoy))
+    .sort(porFecha);
 }
 
 /**
@@ -98,6 +109,25 @@ export async function obtener(servicioId: string, periodo?: string, hoy = hoyISO
   const servicio = await serviciosRepo.obtenerPorId(servicioId);
   if (!servicio) return undefined;
   return periodo ? armar(servicio, periodo, hoy) : pendienteDe(servicio, hoy);
+}
+
+/**
+ * Historial mes a mes de los servicios personales (para la planilla): desde que se cargó cada uno
+ * hasta el mes que viene. Los dados de baja solo aparecen en los meses que tienen algo cargado.
+ */
+export async function historialPersonales(hoy = hoyISO()): Promise<VencimientoServicio[]> {
+  const hasta = periodoSiguiente(hoy.slice(0, 7));
+  const items: VencimientoServicio[] = [];
+  for (const s of await serviciosRepo.listarTodos()) {
+    if (s.propiedadId) continue;
+    const creado = `${s.createdAt.getFullYear()}-${String(s.createdAt.getMonth() + 1).padStart(2, "0")}`;
+    const desde = [creado, ...s.meses.map((m) => m.periodo)].sort()[0]!;
+    for (const periodo of periodosEntre(desde, hasta)) {
+      if (!s.activo && !s.meses.some((m) => m.periodo === periodo)) continue;
+      items.push(armar(s, periodo, hoy));
+    }
+  }
+  return items;
 }
 
 const TIPO_AVISO: Record<TipoAviso, string> = { previo: "servicio_aviso_previo", dia: "servicio_aviso_dia" };
@@ -218,11 +248,26 @@ const montoTexto = (monto: string | null, aprox = true) =>
   monto ? ` — ${aprox ? "aprox. " : ""}${formatoARS(monto)}` : "";
 
 /** "⚡ Luz (Personal) — 15/11/2026 (vence en 3 días) — aprox. $12.000" (o "✅ pagado el ..."). */
-export function lineaServicio(v: VencimientoServicio, hoy = hoyISO()): string {
+export function lineaServicio(v: VencimientoServicio, hoy = hoyISO(), opciones?: { sinDuenio?: boolean }): string {
   const estado = v.fechaPago
     ? `✅ pagado el ${formatoFechaAR(v.fechaPago)}`
     : `${v.diasRestantes < 0 ? "⚠️ " : ""}${cuandoVence(hoy, v.fechaVencimiento)}`;
-  return `${nombreServicio(v.nombre, v.propiedad)} — ${formatoFechaAR(v.fechaVencimiento)} (${estado})${montoTexto(v.monto, !v.fechaPago)}`;
+  const nombre = opciones?.sinDuenio ? `${iconoServicio(v.nombre)} ${v.nombre}` : nombreServicio(v.nombre, v.propiedad);
+  return `${nombre} — ${formatoFechaAR(v.fechaVencimiento)} (${estado})${montoTexto(v.monto, !v.fechaPago)}`;
+}
+
+/**
+ * Agrupa por de quién es: primero lo personal y después cada propiedad (por dirección), con un
+ * título por grupo, así no se mezclan los servicios propios con los de las propiedades.
+ */
+function porDuenio(items: VencimientoServicio[], linea: (v: VencimientoServicio) => string): string[] {
+  const grupos = new Map<string, VencimientoServicio[]>();
+  for (const v of items) {
+    const clave = v.propiedad ?? "";
+    grupos.set(clave, [...(grupos.get(clave) ?? []), v]);
+  }
+  const claves = [...grupos.keys()].sort((a, b) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)));
+  return claves.flatMap((clave) => [clave === "" ? "👤 Personal" : `🏠 ${clave}`, ...grupos.get(clave)!.map(linea)]);
 }
 
 /** Mensaje del aviso que manda el bot solo. */
@@ -247,17 +292,33 @@ export function textoAviso(v: VencimientoServicio, tipo: TipoAviso, hoy = hoyISO
 /** Listado de un mes para Consultas y para la IA. */
 export function textoDelMes(items: VencimientoServicio[], periodo: string, hoy = hoyISO()): string {
   if (items.length === 0) {
-    return "Todavía no cargaste vencimientos de servicios. Sumalos desde ➕ Nueva carga → 📅 Vencimiento.";
+    return periodo < hoy.slice(0, 7)
+      ? `📅 Servicios de ${formatoPeriodoAR(periodo)}\n\nNo había servicios agendados ese mes.`
+      : "Todavía no cargaste vencimientos de servicios. Sumalos desde ➕ Nueva carga → 📅 Vencimiento.";
   }
-  const pendientes = items.filter((v) => !v.fechaPago);
+  // Primero lo que falta pagar y abajo, aparte, lo ya pagado: que no se mezclen.
+  const pendientes = items.filter((v) => !v.fechaPago).sort(porFecha);
+  const pagados = items.filter((v) => v.fechaPago).sort((a, b) => a.fechaPago!.localeCompare(b.fechaPago!));
   const total = pendientes.reduce((acc, v) => acc + Number(v.monto ?? 0), 0);
-  return [
-    `📅 Servicios de ${formatoPeriodoAR(periodo)}`,
-    "",
-    ...items.map((v) => `• ${lineaServicio(v, hoy)}`),
-    "",
+  const pasado = periodo < hoy.slice(0, 7);
+  const bloquePendientes =
     pendientes.length === 0
-      ? "Todo pagado este mes. ✅"
-      : `Falta pagar: ${pendientes.length}${total > 0 ? ` (aprox. ${formatoARS(String(total))})` : ""}`,
-  ].join("\n");
+      ? ["✅ Todo pagado este mes."]
+      : [
+          `🕓 ${pasado ? "Quedó sin pagar" : "Falta pagar"} (${pendientes.length})${total > 0 ? ` — aprox. ${formatoARS(String(total))}` : ""}`,
+          ...porDuenio(pendientes, (v) => `• ${lineaServicio(v, hoy, { sinDuenio: true })}`),
+        ];
+  const bloquePagados =
+    pagados.length === 0
+      ? []
+      : [
+          "",
+          `✅ Pagados (${pagados.length})`,
+          ...porDuenio(
+            pagados,
+            (v) =>
+              `• ${iconoServicio(v.nombre)} ${v.nombre}${v.monto ? ` — ${formatoARS(v.monto)}` : ""} — el ${formatoFechaAR(v.fechaPago!)}`,
+          ),
+        ];
+  return [`📅 Servicios de ${formatoPeriodoAR(periodo)}`, "", ...bloquePendientes, ...bloquePagados].join("\n");
 }

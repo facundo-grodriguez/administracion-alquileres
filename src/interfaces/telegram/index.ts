@@ -16,6 +16,12 @@ import {
 } from "../../core/flows/flowEngine.js";
 import { crearEstadoFlujo, type FlowId, type FlowState, type ResultadoFlujo } from "../../core/flows/types.js";
 import {
+  configPlanilla,
+  linkDePlanilla,
+  programarSincronizacion,
+  sincronizarPlanilla,
+} from "../../core/planilla/sincronizarPlanilla.js";
+import {
   formatearResumenAgenda,
   hayActualizacionesVencidas,
   obtenerResumenAgenda,
@@ -95,7 +101,7 @@ const AYUDA = [
   "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores. Para corregir algo ya cargado (propiedad, pago, gasto), usá ✏️ Modificar.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
-  "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /reset, /ayuda",
+  "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /planilla (planilla de Google), /reset, /ayuda",
 ].join("\n");
 
 // Control de acceso: un bot de Telegram es público. Solo responden los IDs autorizados;
@@ -111,6 +117,16 @@ bot.use(async (ctx, next) => {
     `🔒 No estás autorizado para usar este bot.\n\nTu ID de Telegram es: ${id}\n\n` +
       "Agregalo a TELEGRAM_ALLOWED_USER_IDS en el .env (separado por comas si hay varios) y reiniciá el bot.",
   );
+});
+
+// Planilla de Google: después de atender cada mensaje o botón se pide actualizarla. Espera unos
+// segundos sin actividad y solo escribe si algo cambió, así que las consultas no la tocan.
+bot.use(async (_ctx, next) => {
+  try {
+    await next();
+  } finally {
+    programarSincronizacion();
+  }
 });
 
 /**
@@ -197,6 +213,29 @@ bot.command("agenda", async (ctx) => {
   } catch (error) {
     console.error("Error al obtener la agenda:", error);
     await ctx.reply("No pude leer la agenda. Revisá la conexión a la base de datos.");
+  }
+});
+
+// Planilla de Google: la actualiza en el momento y manda el link (o cómo configurarla).
+bot.command("planilla", async (ctx) => {
+  const conf = configPlanilla();
+  if (!conf) {
+    await ctx.reply(
+      "Todavía no está conectada la planilla de Google. Hay que cargar GOOGLE_SERVICE_ACCOUNT_JSON y " +
+        "GOOGLE_SHEET_ID en Render (los pasos están en docs/planilla-google.md).",
+    );
+    return;
+  }
+  await ctx.replyWithChatAction("typing");
+  try {
+    await sincronizarPlanilla({ forzar: true });
+    await ctx.reply(`📊 Planilla actualizada:\n${linkDePlanilla(conf.planillaId)}`);
+  } catch (error) {
+    console.error("Error al actualizar la planilla:", error);
+    await ctx.reply(
+      `No pude actualizar la planilla: ${error instanceof Error ? error.message : error}\n\n` +
+        `Revisá que esté compartida como Editor con ${conf.cred.client_email}.`,
+    );
   }
 });
 
@@ -428,6 +467,9 @@ if (autorizados.size === 0) {
     );
   }, 5000);
 }
+
+// Al arrancar se pone al día la planilla (por si hubo cambios mientras estaba dormido o en otro deploy).
+programarSincronizacion(10_000);
 
 // Render (y otros hosts similares) exponen la URL pública en RENDER_EXTERNAL_URL automáticamente;
 // WEBHOOK_URL permite fijarla a mano en otras plataformas. Si ninguna está seteada, se asume

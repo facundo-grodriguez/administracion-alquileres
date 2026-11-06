@@ -56,6 +56,22 @@ export function periodoSiguiente(periodo: string): string {
   return mes === 12 ? `${anio + 1}-01` : `${anio}-${String(mes + 1).padStart(2, "0")}`;
 }
 
+/** "2027-01" → "2026-12". */
+export function periodoAnterior(periodo: string): string {
+  const [anio, mes] = periodo.split("-").map(Number) as [number, number];
+  return mes === 1 ? `${anio - 1}-12` : `${anio}-${String(mes - 1).padStart(2, "0")}`;
+}
+
+/**
+ * Si un servicio corresponde a un mes: ya existía ese mes (se cargó ese mes o antes) o tiene algo
+ * cargado para ese mes. Así un servicio agendado hoy no aparece como "vencido" en meses anteriores.
+ */
+export function existiaEnPeriodo(creadoEl: Date, periodo: string, tieneDatosDelMes: boolean): boolean {
+  if (tieneDatosDelMes) return true;
+  const creado = `${creadoEl.getFullYear()}-${String(creadoEl.getMonth() + 1).padStart(2, "0")}`;
+  return creado <= periodo;
+}
+
 /**
  * Fecha de vencimiento de un mes a partir del día fijo. Si el mes no tiene ese día
  * (ej. día 31 en noviembre), vence el último día del mes.

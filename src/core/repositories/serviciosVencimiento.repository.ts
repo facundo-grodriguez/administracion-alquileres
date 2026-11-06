@@ -30,6 +30,11 @@ export async function listarActivos() {
   });
 }
 
+/** Todos, incluso los dados de baja (para el historial de la planilla). */
+export async function listarTodos() {
+  return db.query.serviciosVencimiento.findMany({ with: conDetalle, orderBy: asc(serviciosVencimiento.nombre) });
+}
+
 export async function actualizar(
   id: string,
   datos: { diaVencimiento?: number; monto?: string | null; activo?: boolean },

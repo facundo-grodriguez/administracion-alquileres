@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import { schedule } from "node-cron";
 import { env } from "../../config/env.js";
+import { programarSincronizacion } from "../../core/planilla/sincronizarPlanilla.js";
 import * as recordatoriosRepo from "../../core/repositories/recordatorios.repository.js";
 import {
   formatearResumenAgenda,
@@ -71,6 +72,8 @@ export function iniciarSchedulerAgenda(bot: Bot, destinos: number[]): void {
       await enviarAvisosServicios(bot, destinos).catch((error: unknown) =>
         console.error("Fallaron los avisos de servicios:", error),
       );
+      // Con el cambio de día hay meses que pasan a "atrasado"/"vencido": se refleja en la planilla.
+      programarSincronizacion(1_000);
     },
     { timezone: env.AGENDA_TIMEZONE },
   );

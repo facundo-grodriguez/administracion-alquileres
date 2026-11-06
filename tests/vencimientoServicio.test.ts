@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   avisoQueCorresponde,
   cuandoVence,
+  existiaEnPeriodo,
   fechaDelPeriodo,
   iconoServicio,
   nombreServicio,
+  periodoAnterior,
   periodoPendiente,
   periodoSiguiente,
   tipoGastoDeServicio,
@@ -95,5 +97,20 @@ describe("rubro del gasto al pagar un servicio de propiedad", () => {
     expect(tipoGastoDeServicio("Seguro")).toBe("seguro_hogar");
     expect(tipoGastoDeServicio("Alarma")).toBe("otro");
     expect(tipoGastoDeServicio("Celular")).toBe("otro");
+  });
+});
+
+describe("ver meses anteriores", () => {
+  it("mes anterior, cruzando el año", () => {
+    expect(periodoAnterior("2026-11")).toBe("2026-10");
+    expect(periodoAnterior("2027-01")).toBe("2026-12");
+  });
+
+  it("un servicio cargado este mes no aparece en los anteriores, salvo que tenga algo de ese mes", () => {
+    const creado = new Date(2026, 10, 2); // 2/11/2026
+    expect(existiaEnPeriodo(creado, "2026-11", false)).toBe(true);
+    expect(existiaEnPeriodo(creado, "2026-12", false)).toBe(true);
+    expect(existiaEnPeriodo(creado, "2026-10", false)).toBe(false);
+    expect(existiaEnPeriodo(creado, "2026-10", true)).toBe(true);
   });
 });

@@ -86,6 +86,13 @@ El bot manda una vez por día (por defecto 09:00, hora Argentina) el resumen de 
 
 Para que el bot funcione sin depender de la PC del administrador, ver la guía paso a paso en [`docs/etapa-5-deploy-24-7.md`](docs/etapa-5-deploy-24-7.md). Resumen: se despliega en [Render](https://render.com) (plan free) usando el `render.yaml` de este repo, con un modo webhook (en vez de long-polling) que le permite al servicio recibir mensajes aunque el free tier lo duerma por inactividad. Como el free tier no corre nada mientras está dormido, el recordatorio diario depende de un ping externo (gratis, vía GitHub Actions) que lo despierta un rato antes de `AGENDA_HORA` — ver el detalle y las limitaciones conocidas en el documento de la etapa.
 
+## Planilla de Google
+
+Opcional: el bot mantiene al día una planilla de Google Sheets con el resumen por propiedad, los
+alquileres mes a mes, los gastos de las propiedades y los servicios personales. Se actualiza sola con
+cada cambio. Configuración (cuenta de servicio de Google + dos variables en Render) en
+[`docs/planilla-google.md`](docs/planilla-google.md). En Telegram: `/planilla`.
+
 ## Scripts
 
 | Comando | Qué hace |

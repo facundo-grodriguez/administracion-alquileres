@@ -4,6 +4,7 @@
 import { InlineKeyboard } from "grammy";
 import { detalleContratoTexto } from "../../core/assistant/tools/consultarContrato.tool.js";
 import { historialPagosTexto } from "../../core/assistant/tools/historialPagos.tool.js";
+import { configPlanilla, linkDePlanilla } from "../../core/planilla/sincronizarPlanilla.js";
 import * as contratosRepo from "../../core/repositories/contratos.repository.js";
 import * as gastosRepo from "../../core/repositories/gastosPropiedad.repository.js";
 import * as propiedadesRepo from "../../core/repositories/propiedades.repository.js";
@@ -14,7 +15,7 @@ import * as vencimientosService from "../../core/services/vencimientos.service.j
 import { diasEntreISO, formatoFechaAR, formatoPeriodoAR, hoyISO, sumarDiasISO } from "../../core/util/fecha.js";
 import { formatoARS } from "../../core/util/formato.js";
 import { entraEnBalance } from "../../core/util/responsableGasto.js";
-import { periodoSiguiente } from "../../core/util/vencimientoServicio.js";
+import { periodoAnterior, periodoSiguiente } from "../../core/util/vencimientoServicio.js";
 import { tecladoAlquilerActual } from "./flowKeyboards.js";
 import { cobrosDelMesTexto } from "./menuDirecto.js";
 
@@ -52,6 +53,9 @@ export function tecladoConsultas(): InlineKeyboard {
     for (const o of OPCIONES_CONSULTA.slice(i, i + 2)) teclado.text(o.texto, `${PREFIJO}${o.op}`);
     teclado.row();
   }
+  // Si está conectada la planilla de Google, un botón que la abre.
+  const planilla = configPlanilla();
+  if (planilla) teclado.url("📊 Planilla de Google", linkDePlanilla(planilla.planillaId)).row();
   return teclado;
 }
 
@@ -187,12 +191,17 @@ async function serviciosDelMes(periodo?: string): Promise<RespuestaConsulta> {
   const p = periodo && /^\d{4}-\d{2}$/.test(periodo) ? periodo : hoy.slice(0, 7);
   const items = await serviciosService.delMes(p, hoy);
   const teclado = new InlineKeyboard();
-  if (items.some((v) => !v.fechaPago)) teclado.text("✅ Pagar servicio", "flujo:iniciar:pagar_servicio");
+  const esPasado = p < hoy.slice(0, 7);
+  // "Pagar servicio" paga lo pendiente de ahora: no se ofrece mirando un mes que ya pasó.
+  if (!esPasado && items.some((v) => !v.fechaPago)) teclado.text("✅ Pagar servicio", "flujo:iniciar:pagar_servicio");
   teclado.text("➕ Agregar", "flujo:iniciar:crear_vencimiento_servicio").row();
-  if (items.length > 0) {
+  if (items.length > 0 || esPasado) {
+    // Moverse entre meses: para atrás se ve qué se pagó y cuándo.
+    const anterior = periodoAnterior(p);
     const siguiente = periodoSiguiente(p);
-    teclado.text(`➡️ ${formatoPeriodoAR(siguiente)}`, `${PREFIJO}serv:${siguiente}`);
-    teclado.text("✏️ Cambiar uno", "flujo:iniciar:editar_vencimiento_servicio");
+    teclado.text(`⬅️ ${formatoPeriodoAR(anterior)}`, `${PREFIJO}serv:${anterior}`);
+    teclado.text(`➡️ ${formatoPeriodoAR(siguiente)}`, `${PREFIJO}serv:${siguiente}`).row();
+    if (items.length > 0) teclado.text("✏️ Cambiar uno", "flujo:iniciar:editar_vencimiento_servicio");
   }
   return { texto: serviciosService.textoDelMes(items, p, hoy), teclado: botonOtraConsulta(teclado) };
 }

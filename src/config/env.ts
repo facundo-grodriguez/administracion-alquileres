@@ -45,6 +45,12 @@ const envSchema = z.object({
   RAPIDAPI_KEY: opcional,
   RAPIDAPI_HOST: z.string().default("arquilerapi1.p.rapidapi.com"),
 
+  // Planilla de Google (opcional, v9.10.0): el bot mantiene al día una planilla con gastos y
+  // alquileres. GOOGLE_SERVICE_ACCOUNT_JSON = contenido del .json de la cuenta de servicio (o en
+  // base64); GOOGLE_SHEET_ID = ID o link de la planilla, compartida como Editor con esa cuenta.
+  GOOGLE_SERVICE_ACCOUNT_JSON: opcional,
+  GOOGLE_SHEET_ID: opcional,
+
   // Activa el log de uso/costo de cada llamada a OpenAI (tokens de entrada/salida/total + costo
   // estimado) por consola. Pensado para desarrollo, no para producción (es ruidoso).
   DEBUG_AI: z

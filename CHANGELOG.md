@@ -2,6 +2,24 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.10.0] — 2026-11-06 — Planilla de Google y servicios más claros
+> 📊 Planilla de Google que se actualiza sola: resumen, alquileres, gastos y servicios personales
+> 👤🏠 En 📅 Servicios del mes, lo personal y cada propiedad por separado; lo pagado, abajo y aparte
+> ⬅️ Botón para ver los meses anteriores y qué pagaste en cada uno
+
+Planilla de Google Sheets (opcional) con cuatro pestañas: Resumen por propiedad (alquilada o libre,
+alquiler actual, cobrado / gastos / neto del año y meses adeudados), Alquileres mes a mes por contrato,
+Gastos propiedades y Servicios personales. Unos segundos después de cada cambio en el bot se reescriben
+las pestañas (solo si algo cambió) y una vez por día con el aviso diario. Se conecta con una cuenta de
+servicio de Google: variables `GOOGLE_SERVICE_ACCOUNT_JSON` y `GOOGLE_SHEET_ID` (pasos en
+`docs/planilla-google.md`). Sin agregar dependencias: el login de Google se firma con `node:crypto`.
+Comando `/planilla` (la actualiza y manda el link) y botón en 🔎 Consultas.
+
+"📅 Servicios del mes" se divide en "🕓 Falta pagar" (por fecha de vencimiento, con el total aproximado)
+y "✅ Pagados" (con monto y fecha de pago), y dentro de cada uno primero 👤 Personal y después cada
+🏠 propiedad. Suma el botón del mes anterior; un servicio agendado este mes no aparece como "vencido"
+en los meses anteriores, salvo que tenga algo cargado de ese mes.
+
 ## [9.9.0] — 2026-11-03 — Servicios de propiedad suman al gasto
 > 🏠 Al pagar un servicio de una propiedad, se carga también como gasto de esa propiedad
 > 💲 "Ya lo pagué" te pregunta el monto real (con botón para usar el aproximado)

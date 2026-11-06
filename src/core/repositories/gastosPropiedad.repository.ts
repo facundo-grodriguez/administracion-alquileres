@@ -37,6 +37,11 @@ export async function obtenerPorId(id: string) {
   return db.query.gastosPropiedad.findFirst({ where: eq(gastosPropiedad.id, id), with: conPropiedad });
 }
 
+/** Todos los gastos con su propiedad, del más nuevo al más viejo (para la planilla de Google). */
+export async function listarTodos() {
+  return db.query.gastosPropiedad.findMany({ with: conPropiedad, orderBy: desc(gastosPropiedad.fechaVencimiento) });
+}
+
 /** Los gastos más recientes (pagados o no), para elegir cuál corregir. */
 export async function listarRecientes(limite = 30) {
   return db.query.gastosPropiedad.findMany({

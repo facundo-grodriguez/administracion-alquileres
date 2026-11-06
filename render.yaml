@@ -27,3 +27,7 @@ services:
         value: "30"
       - key: DEBUG_AI
         value: "false"
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false

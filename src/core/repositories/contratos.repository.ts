@@ -63,6 +63,11 @@ export async function listarContratosPorVencer(desde: string, hasta: string) {
   });
 }
 
+/** Todos los contratos (vigentes y terminados), para la planilla de Google. */
+export async function listarTodos() {
+  return db.query.contratos.findMany({ with: conRelaciones, orderBy: contratos.fechaInicio });
+}
+
 export async function listarContratosVigentes() {
   return db.query.contratos.findMany({
     where: eq(contratos.estado, "vigente"),
