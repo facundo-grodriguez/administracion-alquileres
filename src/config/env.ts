@@ -69,3 +69,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// Las fechas del bot ("hoy", vencido o no) son las de Argentina aunque el servidor esté en UTC
+// (Render): sin esto, de 21 a 24 hs el bot ya creía que era el día siguiente.
+if (!process.env.TZ) process.env.TZ = env.AGENDA_TIMEZONE;

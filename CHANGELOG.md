@@ -2,6 +2,15 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.11.1] — 2026-11-06 — Los avisos llegan aunque el bot esté dormido
+> 🔔 La agenda y los avisos de servicios salen apenas el bot se despierta, si a las 9 estaba dormido
+> 🕘 El bot usa la hora de Argentina: de 21 a 24 hs ya no cree que es el día siguiente
+
+En el plan gratis de Render el bot se duerme sin tráfico y a las 9:00 no llegaba a mandar nada (el
+ping de GitHub Actions llega horas tarde). Ahora, al arrancar y cada 10 minutos, revisa si ya pasó
+AGENDA_HORA y lo de hoy no se mandó, y lo manda (sin repetir: queda registrado en la base). El
+proceso fija `TZ` = AGENDA_TIMEZONE si no viene definida.
+
 ## [9.11.0] — 2026-11-06 — Cuotas que terminan y cuadro de servicios
 > 🔚 Servicios con última cuota: avisa hasta ese mes y después se apaga solo
 > 🗑️ Dar de baja ya no borra el seguimiento: lo cargado queda en la planilla

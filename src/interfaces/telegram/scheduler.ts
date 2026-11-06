@@ -20,12 +20,16 @@ const TIPO_DIGEST = "digest_diario";
  * Deduplica por día vía la tabla `recordatorios` (seguro ante reinicios): si ya se mandó hoy, no repite.
  * Con `forzar: true` (para el comando de prueba) manda siempre y no toca el registro del día.
  */
-export async function enviarDigestDiario(bot: Bot, destinos: number[], opciones?: { forzar?: boolean }): Promise<void> {
+export async function enviarDigestDiario(
+  bot: Bot,
+  destinos: number[],
+  opciones?: { forzar?: boolean },
+): Promise<boolean> {
   const forzar = opciones?.forzar ?? false;
   const hoy = hoyISO();
 
   if (!forzar && (await recordatoriosRepo.yaRegistrado(TIPO_DIGEST, hoy))) {
-    return; // ya se envió el digest de hoy
+    return false; // ya se envió el digest de hoy
   }
 
   const resumen = await obtenerResumenAgenda(env.AGENDA_DIAS_ANTICIPACION);
@@ -51,31 +55,62 @@ export async function enviarDigestDiario(bot: Bot, destinos: number[], opciones?
   if (!forzar && algunEnvioExitoso) {
     await recordatoriosRepo.registrarEnvio(TIPO_DIGEST, hoy);
   }
+  return algunEnvioExitoso;
+}
+
+const dosDigitos = (n: number) => String(n).padStart(2, "0");
+
+/** "HH:MM" de ahora, en la hora de Argentina (ver TZ en config/env). */
+export function horaActual(ahora = new Date()): string {
+  return `${dosDigitos(ahora.getHours())}:${dosDigitos(ahora.getMinutes())}`;
+}
+
+/** Si ya es la hora del recordatorio (o más tarde) y, por lo tanto, toca mandar lo de hoy. */
+export const yaEsHora = (hora: string, horaAgenda: string) => hora >= horaAgenda;
+
+let enCurso = false;
+
+/**
+ * La agenda del día y los avisos de servicios. No repite nada: lo ya mandado hoy queda registrado
+ * en la base, así que se puede llamar muchas veces.
+ */
+async function tareaDiaria(bot: Bot, destinos: number[]): Promise<void> {
+  if (enCurso) return;
+  enCurso = true;
+  try {
+    const digest = await enviarDigestDiario(bot, destinos).catch((error: unknown) => {
+      console.error("Falló la agenda diaria:", error);
+      return false;
+    });
+    const avisos = await enviarAvisosServicios(bot, destinos).catch((error: unknown) => {
+      console.error("Fallaron los avisos de servicios:", error);
+      return 0;
+    });
+    if (digest || avisos > 0) {
+      console.log(`Recordatorio diario: agenda ${digest ? "enviada" : "ya estaba"}, ${avisos} aviso(s) de servicios.`);
+      // Con el cambio de día hay meses que pasan a "atrasado"/"vencido": se refleja en la planilla.
+      programarSincronizacion(1_000);
+    }
+  } finally {
+    enCurso = false;
+  }
 }
 
 /**
- * Programa el recordatorio diario a la hora configurada (AGENDA_HORA, AGENDA_TIMEZONE): primero la
- * agenda y después un mensaje por cada servicio que vence en 3 días o hoy (con botones).
+ * Programa el recordatorio diario (AGENDA_HORA, AGENDA_TIMEZONE): primero la agenda y después un
+ * mensaje por cada servicio que vence en 3 días o hoy (con botones).
+ *
+ * En el plan gratis de Render el bot se duerme si nadie le escribe, y a la hora justa puede estar
+ * dormido. Por eso no depende de un único disparo: al arrancar y cada 10 minutos revisa si ya pasó
+ * la hora y lo de hoy no se mandó, y lo manda apenas se despierta.
  */
 export function iniciarSchedulerAgenda(bot: Bot, destinos: number[]): void {
-  const partes = env.AGENDA_HORA.split(":");
-  const hora = Number(partes[0]);
-  const minuto = Number(partes[1]);
-  const expresionCron = `${minuto} ${hora} * * *`; // todos los días a esa hora
-
-  schedule(
-    expresionCron,
-    async () => {
-      await enviarDigestDiario(bot, destinos).catch((error: unknown) =>
-        console.error("Falló la agenda diaria:", error),
-      );
-      await enviarAvisosServicios(bot, destinos).catch((error: unknown) =>
-        console.error("Fallaron los avisos de servicios:", error),
-      );
-      // Con el cambio de día hay meses que pasan a "atrasado"/"vencido": se refleja en la planilla.
-      programarSincronizacion(1_000);
-    },
-    { timezone: env.AGENDA_TIMEZONE },
+  const revisar = () => {
+    if (yaEsHora(horaActual(), env.AGENDA_HORA)) void tareaDiaria(bot, destinos);
+  };
+  schedule("*/10 * * * *", revisar, { timezone: env.AGENDA_TIMEZONE });
+  setTimeout(revisar, 20_000); // al despertar
+  console.log(
+    `Recordatorio diario desde las ${env.AGENDA_HORA} (${env.AGENDA_TIMEZONE}); si el bot estaba dormido, sale al despertar.`,
   );
-  console.log(`Recordatorio diario programado a las ${env.AGENDA_HORA} (${env.AGENDA_TIMEZONE}).`);
 }
