@@ -261,6 +261,39 @@ export const serviciosVencimientoMes = pgTable(
   (t) => [unique("servicios_vencimiento_mes_servicio_periodo_uq").on(t.servicioId, t.periodo)],
 );
 
+/**
+ * Cuentas personales (v9.13.0): presupuesto del mes del administrador, aparte de las propiedades.
+ * Cada rubro tiene un monto previsto que se repite todos los meses (Compras, Nafta, Sueldo...). Si
+ * está vinculado a un vencimiento personal (Seguro, Claude...), lo real es lo que se pagó ahí.
+ */
+export const cuentasRubros = pgTable("cuentas_rubros", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  nombre: varchar("nombre", { length: 60 }).notNull(),
+  /** "gasto" o "ingreso" (el sueldo). */
+  tipo: varchar("tipo", { length: 10 }).notNull().default("gasto"),
+  previsto: numeric("previsto", { precision: 12, scale: 2 }),
+  servicioId: uuid("servicio_id").references(() => serviciosVencimiento.id, { onDelete: "set null" }),
+  orden: integer("orden").notNull().default(0),
+  activo: boolean("activo").notNull().default(true),
+  ...timestamps,
+});
+
+/** Lo de un mes de un rubro: otro previsto solo para ese mes y/o lo real (el total del mes). */
+export const cuentasMes = pgTable(
+  "cuentas_mes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    rubroId: uuid("rubro_id")
+      .notNull()
+      .references(() => cuentasRubros.id, { onDelete: "cascade" }),
+    periodo: varchar("periodo", { length: 7 }).notNull(),
+    previsto: numeric("previsto", { precision: 12, scale: 2 }),
+    real: numeric("real", { precision: 12, scale: 2 }),
+    ...timestamps,
+  },
+  (t) => [unique("cuentas_mes_rubro_periodo_uq").on(t.rubroId, t.periodo)],
+);
+
 export const reparaciones = pgTable("reparaciones", {
   id: uuid("id").defaultRandom().primaryKey(),
   propiedadId: uuid("propiedad_id")
@@ -367,6 +400,15 @@ export const movimientosFinancierosRelations = relations(movimientosFinancieros,
 export const serviciosVencimientoRelations = relations(serviciosVencimiento, ({ one, many }) => ({
   propiedad: one(propiedades, { fields: [serviciosVencimiento.propiedadId], references: [propiedades.id] }),
   meses: many(serviciosVencimientoMes),
+}));
+
+export const cuentasRubrosRelations = relations(cuentasRubros, ({ one, many }) => ({
+  servicio: one(serviciosVencimiento, { fields: [cuentasRubros.servicioId], references: [serviciosVencimiento.id] }),
+  meses: many(cuentasMes),
+}));
+
+export const cuentasMesRelations = relations(cuentasMes, ({ one }) => ({
+  rubro: one(cuentasRubros, { fields: [cuentasMes.rubroId], references: [cuentasRubros.id] }),
 }));
 
 export const serviciosVencimientoMesRelations = relations(serviciosVencimientoMes, ({ one }) => ({

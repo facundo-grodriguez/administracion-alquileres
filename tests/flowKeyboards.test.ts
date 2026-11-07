@@ -171,10 +171,10 @@ describe("tecladoModificar", () => {
 });
 
 describe("tecladoNuevaCarga", () => {
-  it("ofrece los 11 flujos de alta como accesos directos", () => {
+  it("ofrece los 12 flujos de alta como accesos directos", () => {
     const teclado = tecladoNuevaCarga();
     const datos = botones(teclado);
-    expect(datos).toHaveLength(11);
+    expect(datos).toHaveLength(12);
     expect(datos).toEqual(
       expect.arrayContaining([
         "flujo:iniciar:crear_persona",

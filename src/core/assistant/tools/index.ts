@@ -14,6 +14,7 @@ import { crearPersonaTool } from "./crearPersona.tool.js";
 import { crearPropiedadTool } from "./crearPropiedad.tool.js";
 import { crearReciboTool } from "./crearRecibo.tool.js";
 import { crearVencimientoServicioTool } from "./crearVencimientoServicio.tool.js";
+import { cargarCuentaTool, configurarCuentaTool, verCuentasTool } from "./cuentas.tool.js";
 import { historialPagosTool } from "./historialPagos.tool.js";
 import { listarGastosTool } from "./listarGastos.tool.js";
 import { listarSinPagarTool } from "./listarSinPagar.tool.js";
@@ -37,6 +38,9 @@ export const tools = [
   listarVencimientosTool,
   listarGastosTool,
   listarSinPagarTool,
+  verCuentasTool,
+  configurarCuentaTool,
+  cargarCuentaTool,
   obtenerBalanceFinancieroTool,
   consultarGarantesTool,
   consultarContratoTool,

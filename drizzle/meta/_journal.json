@@ -64,6 +64,13 @@
       "when": 1793988046466,
       "tag": "0008_servicio_hasta",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793992883188,
+      "tag": "0009_cuentas_personales",
+      "breakpoints": true
     }
   ]
 }

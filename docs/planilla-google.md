@@ -13,6 +13,8 @@ Las consultas no la tocan: solo se reescribe si algo cambió.
 | **Gastos propiedades** | Cada gasto de cada propiedad: rubro, detalle, quién paga, monto, estado, fecha de pago y si resta del balance. Incluye los servicios de propiedad pagados desde el recordatorio. |
 | **Servicios personales** | Cuadro con una fila por servicio (Monotributo, celular...) y una columna por mes, el más nuevo a la izquierda, hasta el mes actual. Cada celda dice monto y estado en color: 🟩 pagado (con la fecha), 🟨 por vencer, 🟥 vencido sin pagar. Abajo, el total pagado y lo que falta pagar de cada mes. La columna "Termina" muestra la última cuota o si se dio de baja. |
 
+| **Cuentas** | Tu presupuesto personal (v9.13.0): un rubro por fila (Compras, Nafta, Seguro...) y un mes por columna. Cada celda es lo real si ya lo cargaste o lo pagaste (en verde) o lo previsto. Abajo: Total gastos, Sueldo y Sobra. Se arman con `/cuentas` en Telegram. |
+
 Las pestañas de listas tienen filtro en el encabezado (el cuadro de servicios no). **No escribas a mano dentro de estas pestañas**: el bot las
 reescribe enteras en cada actualización. Si querés hacer cuentas propias, usá una pestaña nueva (el bot
 no toca las pestañas que no son suyas) o una copia.

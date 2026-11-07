@@ -44,6 +44,11 @@ export type VencimientoServicio = {
   activo: boolean;
 };
 
+/** El vencimiento de un servicio en un mes (con lo pagado, si se pagó). */
+export function vencimientoDelServicio(servicio: ServicioConDetalle, periodo: string, hoy = hoyISO()) {
+  return armar(servicio, periodo, hoy);
+}
+
 function armar(servicio: ServicioConDetalle, periodo: string, hoy: string): VencimientoServicio {
   const mes = servicio.meses.find((m) => m.periodo === periodo);
   const fechaVencimiento = vencimientoDelMes(servicio.diaVencimiento, periodo, mes);

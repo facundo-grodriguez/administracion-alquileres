@@ -4,6 +4,7 @@ import * as contratosRepo from "../repositories/contratos.repository.js";
 import * as gastosRepo from "../repositories/gastosPropiedad.repository.js";
 import * as propiedadesRepo from "../repositories/propiedades.repository.js";
 import { valorVigente } from "../services/actualizacionAlquiler.service.js";
+import * as cuentasService from "../services/cuentas.service.js";
 import { calcularBalance } from "../services/movimientos.service.js";
 import { historialPagos, type PeriodoHistorial } from "../services/pagos.service.js";
 import * as serviciosService from "../services/serviciosVencimiento.service.js";
@@ -42,6 +43,7 @@ export const PESTANAS = {
   alquileres: "Alquileres",
   gastos: "Gastos propiedades",
   personales: "Servicios personales",
+  cuentas: "Cuentas",
 } as const;
 
 const ESTADO_PAGO: Record<string, string> = {
@@ -220,6 +222,59 @@ async function personales(hoy: string): Promise<Pestana> {
   };
 }
 
+const LEYENDA_CUENTAS = "🟩 ya cargado o pagado   sin color: lo previsto";
+
+/**
+ * "Cuentas" (v9.13.0): el presupuesto personal como lo anota el administrador. Una fila por rubro y
+ * una columna por mes (el más nuevo a la izquierda): lo real si ya se sabe (en verde) o lo previsto.
+ * Abajo, el total de gastos, el sueldo y lo que sobra.
+ */
+async function cuentas(hoy: string): Promise<Pestana> {
+  const meses = (await cuentasService.mesesConCuentas(hoy)).reverse();
+  const porMes = await Promise.all(meses.map((m) => cuentasService.cuentasDelMes(m, hoy)));
+  const columnas: Columna[] = [
+    { titulo: "Rubro" },
+    ...meses.map((m) => ({ titulo: formatoPeriodoAR(m), tipo: "monto" as const })),
+  ];
+  if (meses.length === 0) {
+    return {
+      titulo: PESTANAS.cuentas,
+      columnas,
+      filas: [[cuentasService.TEXTO_SIN_CUENTAS.split("\n")[0]!]],
+      sinFiltro: true,
+    };
+  }
+  // Los rubros, en el orden del mes más nuevo (incluye los que se sumaron después).
+  const rubros = new Map<string, { nombre: string; tipo: string }>();
+  for (const c of porMes) for (const l of [...c.gastos, ...c.ingresos]) rubros.set(l.rubroId, l);
+  const filas: Celda[][] = [];
+  const fondos: (Color | null)[][] = [];
+  const fila = (id: string) => {
+    const valores: Celda[] = [rubros.get(id)!.nombre];
+    const colores: (Color | null)[] = [null];
+    for (const c of porMes) {
+      const l = [...c.gastos, ...c.ingresos].find((x) => x.rubroId === id);
+      valores.push(l ? (l.real ?? l.previsto) : null);
+      colores.push(l?.real !== null && l?.real !== undefined ? COLORES.pagado : null);
+    }
+    filas.push(valores);
+    fondos.push(colores);
+  };
+  for (const [id, r] of rubros) if (r.tipo === "gasto") fila(id);
+  const negritas: number[] = [];
+  filas.push([]);
+  negritas.push(filas.length);
+  filas.push(["Total gastos", ...porMes.map((c) => c.totales.proyectado)]);
+  filas.push([]);
+  for (const [id, r] of rubros) if (r.tipo === "ingreso") fila(id);
+  if (porMes.some((c) => c.ingresos.length > 0)) {
+    negritas.push(filas.length);
+    filas.push(["Sobra", ...porMes.map((c) => c.totales.sobraProyectada)]);
+  }
+  filas.push([], [LEYENDA_CUENTAS]);
+  return { titulo: PESTANAS.cuentas, columnas, filas, fondos, negritas, columnasFijas: 1, sinFiltro: true };
+}
+
 async function resumen(
   contratos: Contrato[],
   historiales: Map<string, PeriodoHistorial[]>,
@@ -286,5 +341,6 @@ export async function armarPlanilla(hoy = hoyISO()): Promise<Pestana[]> {
     await alquileres(contratos, historiales),
     await gastos(hoy),
     await personales(hoy),
+    await cuentas(hoy),
   ];
 }

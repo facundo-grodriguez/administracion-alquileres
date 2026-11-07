@@ -2,6 +2,24 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.13.0] — 2026-11-06 — Cuentas personales
+> 📒 Tu presupuesto del mes en el bot: rubros con lo previsto, el sueldo y cuánto sobra
+> ⚙️ Se arman sin gastar IA: /cuentas con la lista, o el botón ⚙️ Rubros
+> 🔗 Lo reservado y los vencimientos van por separado; si lo pedís, un rubro toma lo pagado en su vencimiento
+> 📊 Pestaña "Cuentas" en la planilla, con tu misma estructura: rubro por fila, mes por columna
+
+Cuentas personales del administrador, aparte de las propiedades (no tocan ningún balance). Se arman
+con `/cuentas` y abajo la lista, un rubro por línea ("Compras 250000", "Sueldo 1020935"), que se lee
+sin IA; "(vencimiento Moto GP)" vincula el rubro, "(sin vincular)" lo separa y "quitar Nafta" lo saca.
+También desde el botón ⚙️ Rubros (flujo `configurar_cuenta`: agregar, cambiar lo reservado, vincular,
+desvincular, quitar) o escribiéndole al asistente. Cada rubro tiene un previsto que se repite todos
+los meses y se puede cambiar para un mes. Lo real se carga como total del mes o sumando ("este mes en
+compras gasté 230000", o ➕ Nueva carga → 📒 Cuenta del mes); un rubro vinculado a un vencimiento
+personal toma lo pagado ahí. Ningún rubro se vincula solo. 🔎 Consultas → 📒 Cuentas del mes muestra
+sueldo, gastos previstos, lo que sobra, lo gastado hasta ahora y lo que sobraría, con ⬅️/➡️ meses.
+Tools nuevas `configurar_cuenta`, `cargar_cuenta` y `ver_cuentas`. Tablas `cuentas_rubros` y
+`cuentas_mes` (migración 0009, se aplica sola al arrancar).
+
 ## [9.12.0] — 2026-11-06 — Gastos y vencimientos conectados
 > 💡 "Gastos sin pagar" junta todo: gastos cargados y vencimientos del mes, por Personal y cada propiedad
 > ✅ Un solo botón "Pagar" para gastos y servicios

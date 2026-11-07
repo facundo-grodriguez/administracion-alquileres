@@ -20,7 +20,9 @@ export type FlowId =
   | "cargar_gastos"
   | "crear_vencimiento_servicio"
   | "pagar_servicio"
-  | "editar_vencimiento_servicio";
+  | "editar_vencimiento_servicio"
+  | "cargar_cuenta"
+  | "configurar_cuenta";
 
 export type DatosFlujo = Record<string, unknown>;
 

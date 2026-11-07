@@ -35,6 +35,7 @@ const MIGRACIONES_AL_ARRANCAR = [
   "0006_servicios_vencimiento.sql",
   "0007_servicio_mes_gasto.sql",
   "0008_servicio_hasta.sql",
+  "0009_cuentas_personales.sql",
 ];
 
 async function aplicarMigracion(archivo: string): Promise<void> {

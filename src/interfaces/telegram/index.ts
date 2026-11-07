@@ -26,6 +26,7 @@ import {
   hayActualizacionesVencidas,
   obtenerResumenAgenda,
 } from "../../core/services/agenda.service.js";
+import * as cuentasService from "../../core/services/cuentas.service.js";
 import { esCallbackAccion, resolverAccion } from "./acciones.js";
 import { enviarAvisosServicios, esCallbackServicio, resolverCallbackServicio } from "./avisosServicios.js";
 import { avisarVersionNueva } from "./avisoVersion.js";
@@ -101,7 +102,7 @@ const AYUDA = [
   "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores. Para corregir algo ya cargado (propiedad, pago, gasto), usá ✏️ Modificar.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
-  "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /planilla (planilla de Google), /reset, /ayuda",
+  "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /planilla (planilla de Google), /cuentas (armar tus cuentas personales), /reset, /ayuda",
 ].join("\n");
 
 // Control de acceso: un bot de Telegram es público. Solo responden los IDs autorizados;
@@ -236,6 +237,27 @@ bot.command("planilla", async (ctx) => {
       `No pude actualizar la planilla: ${error instanceof Error ? error.message : error}\n\n` +
         `Revisá que esté compartida como Editor con ${conf.cred.client_email}.`,
     );
+  }
+});
+
+// Cuentas personales sin IA: "/cuentas" solo muestra el mes y cómo armarlas; con una lista abajo
+// (un rubro por línea) agrega o cambia esos rubros.
+bot.command("cuentas", async (ctx) => {
+  await ctx.replyWithChatAction("typing");
+  try {
+    const lista = typeof ctx.match === "string" ? ctx.match.trim() : "";
+    const hechos = lista ? await cuentasService.aplicarLista(lista) : [];
+    const { texto, teclado } = await responderConsulta("cq:cta");
+    const encabezado = lista ? `Listo, tus cuentas:\n${hechos.join("\n")}\n\n` : "";
+    const pie = lista ? "" : `\n\n${cuentasService.TEXTO_COMO_ARMAR}`;
+    const partes = dividirMensaje(`${encabezado}${texto}${texto.includes("Todavía no armaste") ? "" : pie}`);
+    for (let i = 0; i < partes.length; i++) {
+      const esUltima = i === partes.length - 1;
+      await ctx.reply(partes[i]!, esUltima && teclado ? { reply_markup: teclado } : undefined);
+    }
+  } catch (error) {
+    console.error("Error con /cuentas:", error);
+    await ctx.reply("No pude guardar las cuentas. Probá de nuevo en un momento.");
   }
 });
 

@@ -9,6 +9,7 @@ import { configPlanilla, linkDePlanilla } from "../../core/planilla/sincronizarP
 import * as contratosRepo from "../../core/repositories/contratos.repository.js";
 import * as gastosRepo from "../../core/repositories/gastosPropiedad.repository.js";
 import * as propiedadesRepo from "../../core/repositories/propiedades.repository.js";
+import * as cuentasService from "../../core/services/cuentas.service.js";
 import * as movimientosService from "../../core/services/movimientos.service.js";
 import * as pagosService from "../../core/services/pagos.service.js";
 import * as serviciosService from "../../core/services/serviciosVencimiento.service.js";
@@ -36,6 +37,7 @@ export const OPCIONES_CONSULTA: OpcionConsulta[] = [
   { op: "gar", texto: "🛡️ Garantes", porContrato: true },
   { op: "bal", texto: "💵 Balance" },
   { op: "serv", texto: "📅 Servicios del mes" },
+  { op: "cta", texto: "📒 Cuentas del mes" },
 ];
 
 export type RespuestaConsulta = { texto: string; teclado?: InlineKeyboard };
@@ -251,11 +253,28 @@ async function porContrato(op: string, contratoId: string): Promise<RespuestaCon
   }
 }
 
+// Cuentas personales: "cq:cta" el mes actual y "cq:cta:<YYYY-MM>" otro mes.
+async function cuentasDelMes(periodo?: string): Promise<RespuestaConsulta> {
+  const hoy = hoyISO();
+  const p = periodo && /^\d{4}-\d{2}$/.test(periodo) ? periodo : hoy.slice(0, 7);
+  const c = await cuentasService.cuentasDelMes(p, hoy);
+  const teclado = new InlineKeyboard();
+  if (c.gastos.length + c.ingresos.length > 0) {
+    teclado.text("➕ Cargar", "flujo:iniciar:cargar_cuenta").text("⚙️ Rubros", "flujo:iniciar:configurar_cuenta").row();
+    teclado.text(`⬅️ ${formatoPeriodoAR(periodoAnterior(p))}`, `${PREFIJO}cta:${periodoAnterior(p)}`);
+    teclado.text(`➡️ ${formatoPeriodoAR(periodoSiguiente(p))}`, `${PREFIJO}cta:${periodoSiguiente(p)}`).row();
+  } else {
+    teclado.text("⚙️ Armar rubros", "flujo:iniciar:configurar_cuenta").row();
+  }
+  return { texto: cuentasService.textoCuentas(c, hoy), teclado: botonOtraConsulta(teclado) };
+}
+
 /** Resuelve un botón del menú de Consultas. */
 export async function responderConsulta(datos: string): Promise<RespuestaConsulta> {
   const { op, contratoId, extra } = parseCallbackConsulta(datos);
   if (op === "bal") return balance(contratoId, extra);
   if (op === "serv") return serviciosDelMes(contratoId, extra);
+  if (op === "cta") return cuentasDelMes(contratoId);
   if (contratoId) return porContrato(op, contratoId);
 
   const opcion = OPCIONES_CONSULTA.find((o) => o.op === op);
