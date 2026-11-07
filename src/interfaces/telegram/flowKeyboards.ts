@@ -65,11 +65,13 @@ export function tecladoModificar(): InlineKeyboard {
   return teclado;
 }
 
-function botonCancelar(teclado: InlineKeyboard): InlineKeyboard {
-  return teclado.row().text("❌ Cancelar", "flujo:cancelar");
+function botonCancelar(teclado: InlineKeyboard, puedeVolver = false): InlineKeyboard {
+  teclado.row();
+  if (puedeVolver) teclado.text("⬅️ Atrás", "flujo:atras");
+  return teclado.text("❌ Cancelar", "flujo:cancelar");
 }
 
-function tecladoParaCampo(campo: CampoFlujo): InlineKeyboard {
+function tecladoParaCampo(campo: CampoFlujo, puedeVolver = false): InlineKeyboard {
   const teclado = new InlineKeyboard();
 
   switch (campo.tipo) {
@@ -80,8 +82,11 @@ function tecladoParaCampo(campo: CampoFlujo): InlineKeyboard {
       }
       break;
     }
-    case "confirmacion":
-      return new InlineKeyboard().text("✅ Confirmar", "flujo:confirmar").text("❌ Cancelar", "flujo:cancelar");
+    case "confirmacion": {
+      const confirmar = new InlineKeyboard().text("✅ Confirmar", "flujo:confirmar").row();
+      if (puedeVolver) confirmar.text("⬅️ Atrás", "flujo:atras");
+      return confirmar.text("❌ Cancelar", "flujo:cancelar");
+    }
     case "fecha":
       if (campo.permitirHoy) teclado.text("📅 Hoy", "flujo:hoy").row();
       if (campo.opcional) teclado.text("⏭️ Omitir", "flujo:omitir").row();
@@ -96,7 +101,7 @@ function tecladoParaCampo(campo: CampoFlujo): InlineKeyboard {
       break; // se espera texto libre para buscar; el teclado de candidatos se arma aparte
   }
 
-  return botonCancelar(teclado);
+  return botonCancelar(teclado, puedeVolver);
 }
 
 /** Convierte el resultado del motor de flujos en un mensaje listo para mandar por Telegram. */
@@ -112,7 +117,7 @@ function renderSinCarga(resultado: ResultadoFlujo): { texto: string; teclado?: I
   switch (resultado.tipo) {
     case "pregunta":
     case "reprompt":
-      return { texto: resultado.texto, teclado: tecladoParaCampo(resultado.campo) };
+      return { texto: resultado.texto, teclado: tecladoParaCampo(resultado.campo, resultado.puedeVolver) };
     case "candidatos": {
       const teclado = new InlineKeyboard();
       resultado.candidatos.forEach((candidato, i) => {
@@ -124,7 +129,7 @@ function renderSinCarga(resultado: ResultadoFlujo): { texto: string; teclado?: I
       // "Buscar de nuevo" solo tiene sentido después de una búsqueda real — en el listado inicial
       // de existentes el usuario puede escribir para buscar en cualquier momento, sin el botón.
       if (resultado.esBusqueda) teclado.text("🔍 Buscar de nuevo", "flujo:buscar_de_nuevo").row();
-      return { texto: resultado.texto, teclado: botonCancelar(teclado) };
+      return { texto: resultado.texto, teclado: botonCancelar(teclado, resultado.puedeVolver) };
     }
     case "confirmar_cancelacion":
       return {

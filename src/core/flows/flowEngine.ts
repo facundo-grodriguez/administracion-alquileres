@@ -17,9 +17,9 @@ import { etiquetaKey } from "./types.js";
 import { parseFechaUsuario, parseMontoUsuario, parseNumeroUsuario, parsePeriodoUsuario } from "./validadores.js";
 
 /** Tope de resultados al buscar por texto (el usuario ya escribió algo, se puede acotar más). */
-const MAX_CANDIDATOS_BUSQUEDA = 5;
+const MAX_CANDIDATOS_BUSQUEDA = 10;
 /** Tope del listado inicial de existentes al entrar a un paso "entidad" (antes de escribir nada). */
-const MAX_CANDIDATOS_LISTADO = 8;
+const MAX_CANDIDATOS_LISTADO = 30;
 
 const TEXTO_CONFIRMAR_CANCELACION =
   "¿Estás seguro de que querés cancelar esta carga? Se va a perder todo lo que cargaste hasta ahora.";
@@ -31,6 +31,8 @@ export const CALLBACK_CONFIRMAR = "confirmar";
 export const CALLBACK_OMITIR = "omitir";
 export const CALLBACK_HOY = "hoy";
 export const CALLBACK_BUSCAR_DE_NUEVO = "buscar_de_nuevo";
+export const CALLBACK_ATRAS = "atras";
+const TEXTO_ATRAS = /^\s*(⬅️\s*)?(atr[aá]s|volver)\s*$/i;
 
 /** Registro de flujos: por defecto los reales (`FLUJOS`), pero inyectable — así se puede testear
  * la mecánica genérica del motor (avance, saltos, sub-flujos, confirmación) con flujos de prueba
@@ -158,15 +160,45 @@ async function siguientePaso(estado: FlowState, registro: RegistroFlujos): Promi
       frame.datos[p.id] = undefined;
       frame.datos[etiquetaKey(p.id)] = undefined;
     }
+    frame.historial = frame.historial?.filter((i) => i < desde);
     frame.pasoActual = desde;
     const repregunta = await renderDesde(estado, registro);
     return "texto" in repregunta ? { ...repregunta, texto: `${aviso.mensaje}\n\n${repregunta.texto}` } : repregunta;
   }
+  frame.historial = [...(frame.historial ?? []), frame.pasoActual];
   frame.pasoActual += 1;
   return renderDesde(estado, registro);
 }
 
-export function iniciarFlujo(
+/**
+ * "⬅️ Atrás": vuelve a la última pregunta contestada (y borra esa respuesta). En la primera pregunta
+ * de un alta inline, vuelve a la pregunta del flujo de arriba; en la primera de todas, la repite.
+ */
+async function volverAtras(estado: FlowState, registro: RegistroFlujos): Promise<ResultadoFlujo> {
+  const frame = tope(estado);
+  if (!frame) return { tipo: "sin_flujo" };
+  const anterior = frame.historial?.pop();
+  if (anterior === undefined) {
+    if (estado.pila.length > 1) estado.pila.pop();
+    return renderDesde(estado, registro);
+  }
+  const paso = registro[frame.flowId].pasos[anterior];
+  if (paso) {
+    frame.datos[paso.id] = undefined;
+    frame.datos[etiquetaKey(paso.id)] = undefined;
+  }
+  frame.pasoActual = anterior;
+  return renderDesde(estado, registro);
+}
+
+/** Marca si la pregunta que se va a mostrar tiene una anterior a la que volver. */
+function conAtras(estado: FlowState, r: ResultadoFlujo): ResultadoFlujo {
+  if (r.tipo !== "pregunta" && r.tipo !== "candidatos" && r.tipo !== "reprompt") return r;
+  const frame = tope(estado);
+  return { ...r, puedeVolver: (frame?.historial?.length ?? 0) > 0 || estado.pila.length > 1 };
+}
+
+export async function iniciarFlujo(
   estado: FlowState,
   flowId: FlowId,
   datosIniciales: DatosFlujo = {},
@@ -174,7 +206,7 @@ export function iniciarFlujo(
 ): Promise<ResultadoFlujo> {
   estado.carga = (estado.carga ?? 0) + 1;
   estado.pila.push({ flowId, pasoActual: 0, datos: datosIniciales });
-  return renderDesde(estado, registro);
+  return conAtras(estado, await renderDesde(estado, registro));
 }
 
 /** Inicia un sub-flujo de alta inline (ej. crear una persona nueva en medio de crear_contrato).
@@ -259,11 +291,21 @@ export async function procesarTexto(
   etiquetasMenuPrincipal: readonly string[] = [],
   registro: RegistroFlujos = FLUJOS,
 ): Promise<ResultadoFlujo> {
+  return conAtras(estado, await procesarTextoBase(estado, texto, etiquetasMenuPrincipal, registro));
+}
+
+async function procesarTextoBase(
+  estado: FlowState,
+  texto: string,
+  etiquetasMenuPrincipal: readonly string[],
+  registro: RegistroFlujos,
+): Promise<ResultadoFlujo> {
   const frame = tope(estado);
   if (!frame) return { tipo: "sin_flujo" };
   const paso = pasoActualDe(frame, registro);
   if (!paso) return renderDesde(estado, registro);
 
+  if (TEXTO_ATRAS.test(texto)) return volverAtras(estado, registro);
   if (esInterrupcion(texto, etiquetasMenuPrincipal)) return { tipo: "interrumpido", textoOriginal: texto };
 
   switch (paso.campo.tipo) {
@@ -338,6 +380,15 @@ export async function procesarSeleccion(
   valor?: string,
   registro: RegistroFlujos = FLUJOS,
 ): Promise<ResultadoFlujo> {
+  return conAtras(estado, await procesarSeleccionBase(estado, accion, valor, registro));
+}
+
+async function procesarSeleccionBase(
+  estado: FlowState,
+  accion: string,
+  valor: string | undefined,
+  registro: RegistroFlujos,
+): Promise<ResultadoFlujo> {
   const frame = tope(estado);
   if (!frame) return { tipo: "sin_flujo" };
 
@@ -357,6 +408,8 @@ export async function procesarSeleccion(
   if (accion === CALLBACK_CONTINUAR) {
     return renderPaso(frame, paso);
   }
+
+  if (accion === CALLBACK_ATRAS) return volverAtras(estado, registro);
 
   if (accion === CALLBACK_CONFIRMAR && paso.campo.tipo === "confirmacion") {
     return finalizarFrameSuperior(estado, registro);

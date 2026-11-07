@@ -146,7 +146,7 @@ export const pagarGastoFlow: DefinicionFlujo = {
         ? `${gasto.monto ? `Monto: ${formatoARS(gasto.monto)} — ` : ""}lo paga el inquilino, no se descuenta del alquiler.`
         : gasto.monto
           ? `Monto: ${formatoARS(gasto.monto)} — ya figura en el balance.`
-          : "No tiene monto cargado, así que no entra en el balance. Corregilo desde ✏️ Modificar → 💡 Gasto.",
+          : "No tiene monto cargado, así que no entra en el balance. Corregilo desde ✏️ Corregir → 💡 Gasto.",
     ].join("\n");
   },
   botonesPostAccion: "post_gasto",

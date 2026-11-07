@@ -1,7 +1,7 @@
 import { z } from "zod";
 import * as propiedadesRepo from "../../repositories/propiedades.repository.js";
 import * as serviciosService from "../../services/serviciosVencimiento.service.js";
-import { formatoFechaAR, formatoPeriodoAR } from "../../util/fecha.js";
+import { formatoFechaAR, formatoPeriodoAR, hoyISO } from "../../util/fecha.js";
 import { formatoARS } from "../../util/formato.js";
 import { nombreServicio } from "../../util/vencimientoServicio.js";
 import { defineTool } from "../defineTool.js";
@@ -23,6 +23,10 @@ export const crearVencimientoServicioTool = defineTool({
       .regex(/^\d{4}-\d{2}$/)
       .optional()
       .describe("Último mes que vence (YYYY-MM), si son cuotas o termina. Si no, todos los meses sin fin."),
+    debito_automatico: z
+      .boolean()
+      .optional()
+      .describe("true si se debita solo: no avisa y se marca pagado el día que vence (con el monto)."),
   }),
   run: async (input) => {
     const propiedad = input.propiedad_id ? await propiedadesRepo.obtenerPropiedadPorId(input.propiedad_id) : undefined;
@@ -33,6 +37,7 @@ export const crearVencimientoServicioTool = defineTool({
       diaVencimiento: input.dia_vencimiento,
       monto: input.monto ?? null,
       hastaPeriodo: input.hasta_periodo ?? null,
+      debitoDesde: input.debito_automatico ? hoyISO() : null,
     });
     return [
       "Listo, agendé el vencimiento.",
@@ -42,7 +47,9 @@ export const crearVencimientoServicioTool = defineTool({
       `Próximo: ${formatoFechaAR(v.fechaVencimiento)}`,
       v.monto ? `Monto aprox.: ${formatoARS(v.monto)}` : null,
       v.hastaPeriodo ? `Última cuota: ${formatoPeriodoAR(v.hastaPeriodo)}` : null,
-      "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
+      v.debito
+        ? "🔄 Se debita solo: no te aviso, lo marco pagado el día que vence y te lo muestro en la agenda."
+        : "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
       `(id: ${v.servicioId})`,
     ]
       .filter((l) => l !== null)

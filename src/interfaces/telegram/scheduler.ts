@@ -10,6 +10,7 @@ import {
 } from "../../core/services/agenda.service.js";
 import { sinPagar } from "../../core/services/sinPagar.service.js";
 import { hoyISO } from "../../core/util/fecha.js";
+import { tecladoDebitos } from "./avisosServicios.js";
 import { TEXTO_AYUDA_ALQUILER_ACTUAL, tecladoAlquilerActual } from "./flowKeyboards.js";
 import { dividirMensaje } from "./util.js";
 
@@ -36,10 +37,12 @@ export async function enviarDigestDiario(
   const texto = formatearResumenAgenda(resumen);
   // Un solo mensaje con todo (v9.12.0): abajo, el botón para pagar lo que falte.
   const deuda = await sinPagar(hoy);
-  const teclado =
+  let teclado =
     deuda.gastos.length + deuda.servicios.length > 0
       ? new InlineKeyboard().text("✅ Pagar", "flujo:iniciar:pagar_gasto").text("💡 Ver sin pagar", "cq:gastos")
       : undefined;
+  // Lo que se debitó solo hoy: un botón por si fue otro monto (v9.14.0).
+  if (resumen.debitos?.length) teclado = tecladoDebitos(resumen.debitos, teclado);
 
   let algunEnvioExitoso = false;
   for (const chatId of destinos) {

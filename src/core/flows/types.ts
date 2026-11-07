@@ -22,7 +22,8 @@ export type FlowId =
   | "pagar_servicio"
   | "editar_vencimiento_servicio"
   | "cargar_cuenta"
-  | "configurar_cuenta";
+  | "configurar_cuenta"
+  | "corregir_debito";
 
 export type DatosFlujo = Record<string, unknown>;
 
@@ -91,6 +92,8 @@ export type FlowFrame = {
   candidatosPendientes?: CandidatoFlujo[];
   /** Si este frame es un sub-flujo (alta inline), el id del campo del padre a completar al terminar. */
   campoDestino?: string;
+  /** Los pasos que ya contestó el usuario, en orden (para "⬅️ Atrás"). */
+  historial?: number[];
 };
 
 export type FlowState = {
@@ -104,9 +107,11 @@ export function crearEstadoFlujo(): FlowState {
 }
 
 export type ResultadoFlujo =
-  | { tipo: "pregunta"; texto: string; campo: CampoFlujo }
+  | { tipo: "pregunta"; texto: string; campo: CampoFlujo; puedeVolver?: boolean }
   | {
       tipo: "candidatos";
+      /** Hay un paso anterior al que volver con "⬅️ Atrás". */
+      puedeVolver?: boolean;
       texto: string;
       candidatos: CandidatoFlujo[];
       permiteCrear?: FlowId;
@@ -114,7 +119,7 @@ export type ResultadoFlujo =
       /** true = resultado de una búsqueda que escribió el usuario; ausente/false = listado inicial de existentes. */
       esBusqueda?: boolean;
     }
-  | { tipo: "reprompt"; texto: string; campo: CampoFlujo }
+  | { tipo: "reprompt"; texto: string; campo: CampoFlujo; puedeVolver?: boolean }
   | { tipo: "interrumpido"; textoOriginal: string }
   | { tipo: "completado"; texto: string; botonesPostAccion?: ContextoTeclado; referencia?: ReferenciaEntidad }
   | { tipo: "cancelado"; texto: string }

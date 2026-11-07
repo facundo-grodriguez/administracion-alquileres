@@ -123,6 +123,7 @@ function registroCon(buscarResponsable: (q: string) => Promise<CandidatoFlujo[]>
     editar_vencimiento_servicio: flujoDummy("editar_vencimiento_servicio"),
     cargar_cuenta: flujoDummy("cargar_cuenta"),
     configurar_cuenta: flujoDummy("configurar_cuenta"),
+    corregir_debito: flujoDummy("corregir_debito"),
   };
 }
 
@@ -143,13 +144,33 @@ beforeEach(() => {
   estado = crearEstadoFlujo();
 });
 
+describe("flowEngine — ⬅️ Atrás", () => {
+  it("vuelve a la pregunta anterior, borra esa respuesta y no ofrece atrás en la primera", async () => {
+    const registro = registroCon(vi.fn(async () => [] as CandidatoFlujo[]));
+    let r = await iniciarFlujo(estado, "crear_propiedad", {}, registro);
+    expect(r.tipo === "pregunta" && r.puedeVolver).toBe(false);
+    r = await procesarTexto(estado, "Depto Centro", [], registro);
+    expect(r.tipo === "pregunta" && r.texto === "¿Apodo? (opcional)" && r.puedeVolver).toBe(true);
+    r = await procesarSeleccion(estado, CALLBACK_OMITIR, undefined, registro);
+    expect(r.tipo === "pregunta" && r.texto).toBe("¿Edad?");
+    r = await procesarSeleccion(estado, "atras", undefined, registro);
+    expect(r.tipo === "pregunta" && r.texto).toBe("¿Apodo? (opcional)");
+    r = await procesarTexto(estado, "atrás", [], registro);
+    expect(r.tipo === "pregunta" && r.texto).toBe("¿Nombre?");
+    expect(r.tipo === "pregunta" && r.puedeVolver).toBe(false);
+    expect(estado.pila[0]!.datos.nombre).toBeUndefined();
+    r = await procesarTexto(estado, "Casa", [], registro);
+    expect(r.tipo === "pregunta" && r.texto).toBe("¿Apodo? (opcional)");
+  });
+});
+
 describe("flowEngine — avance lineal y validación por tipo de campo", () => {
   it("recorre texto → texto opcional (omitido) → número → monto → fecha (hoy) → período → opciones → confirmación → completado", async () => {
     const buscar = vi.fn(async () => [] as CandidatoFlujo[]);
     const registro = registroCon(buscar);
 
     let r = await iniciarFlujo(estado, "crear_propiedad", {}, registro);
-    expect(r).toEqual({ tipo: "pregunta", texto: "¿Nombre?", campo: { tipo: "texto" } });
+    expect(r).toEqual({ tipo: "pregunta", texto: "¿Nombre?", campo: { tipo: "texto" }, puedeVolver: false });
 
     r = await procesarTexto(estado, "Depto Centro", [], registro);
     if (r.tipo === "pregunta") expect(r.texto).toBe("¿Apodo? (opcional)");
@@ -223,14 +244,14 @@ describe("flowEngine — paso entidad: listado inicial de existentes", () => {
     if (rFinal.tipo === "completado") expect(rFinal.texto).toContain("responsable=Juan Gómez");
   });
 
-  it("recorta el listado inicial a 8 aunque existan más", async () => {
-    const muchos: CandidatoFlujo[] = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, etiqueta: `Persona ${i}` }));
+  it("recorta el listado inicial a 30 aunque existan más", async () => {
+    const muchos: CandidatoFlujo[] = Array.from({ length: 40 }, (_, i) => ({ id: `p${i}`, etiqueta: `Persona ${i}` }));
     const registro = registroCon(async () => muchos);
 
     const r = await avanzarHastaResponsable(estado, registro);
 
     expect(r.tipo).toBe("candidatos");
-    if (r.tipo === "candidatos") expect(r.candidatos).toHaveLength(8);
+    if (r.tipo === "candidatos") expect(r.candidatos).toHaveLength(30);
   });
 
   it("escribir texto en cualquier momento sigue buscando (no queda atado al listado inicial)", async () => {

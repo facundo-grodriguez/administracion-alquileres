@@ -239,6 +239,8 @@ export const serviciosVencimiento = pgTable("servicios_vencimiento", {
   activo: boolean("activo").notNull().default(true),
   /** v9.11.0: último mes que corresponde (YYYY-MM): la última cuota, o el mes de la baja. Null = sin fin. */
   hastaPeriodo: varchar("hasta_periodo", { length: 7 }),
+  /** v9.14.0: se debita solo desde esta fecha (se marca pagado el día que vence, sin avisos). Null = lo paga a mano. */
+  debitoDesde: date("debito_desde"),
   ...timestamps,
 });
 

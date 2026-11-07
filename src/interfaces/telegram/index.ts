@@ -28,7 +28,12 @@ import {
 } from "../../core/services/agenda.service.js";
 import * as cuentasService from "../../core/services/cuentas.service.js";
 import { esCallbackAccion, resolverAccion } from "./acciones.js";
-import { enviarAvisosServicios, esCallbackServicio, resolverCallbackServicio } from "./avisosServicios.js";
+import {
+  enviarAvisosServicios,
+  esCallbackServicio,
+  resolverCallbackServicio,
+  tecladoDebitos,
+} from "./avisosServicios.js";
 import { avisarVersionNueva } from "./avisoVersion.js";
 import { esCallbackConsulta, responderConsulta, tecladoConsultas } from "./consultas.js";
 import {
@@ -43,12 +48,14 @@ import {
 import {
   construirInlineKeyboard,
   ETIQUETAS_MENU_PRINCIPAL,
+  MENU,
   menuPrincipalKeyboard,
   NAV_CANCELAR,
   NAV_MENU,
   textoParaCallback,
 } from "./keyboards.js";
 import { cobrosDelMesTexto, listarContratosVigentesTexto, listarPropiedadesTexto } from "./menuDirecto.js";
+import { esCallbackMas, responderMas, TEXTO_MAS, tecladoMas } from "./menuMas.js";
 import { enviarDigestDiario, iniciarSchedulerAgenda } from "./scheduler.js";
 import { dividirMensaje, textoConEleccion } from "./util.js";
 
@@ -99,7 +106,7 @@ const AYUDA = [
   "• Cargá un gasto de expensas para [propiedad] que vence el 30/08",
   "• La luz de casa vence el 15 de cada mes (te aviso 3 días antes y ese día)",
   "",
-  "Con 🔎 Consultas ves todo lo que se puede consultar (deudas, historial de pagos, gastos, balance...). Si tenés meses ya cobrados de antes de usar el bot, cargalos desde ➕ Nueva carga → 📚 Pagos anteriores. Para corregir algo ya cargado (propiedad, pago, gasto), usá ✏️ Modificar.",
+  "Abajo tenés lo de todos los días: 📊 Hoy (qué vence y qué está atrasado), ✅ Pagar, 📒 Mis cuentas, ✏️ Corregir algo ya cargado y 💰 Cobro alquiler. Todo lo demás está en ⚙️ Más, por tema: 🏠 Alquileres (cobros, deudas, historial, balance...), 💡 Gastos y servicios, ➕ Altas (persona, propiedad, contrato, pagos anteriores) y la planilla.",
   "• Dá de alta a Pedro Fernández, DNI 32111222",
   "",
   "Comandos: /agenda (resumen completo), /enviar_agenda (probar el recordatorio), /planilla (planilla de Google), /cuentas (armar tus cuentas personales), /reset, /ayuda",
@@ -181,6 +188,9 @@ async function enviarAgenda(ctx: Context): Promise<void> {
   }
   if (hayActualizacionesVencidas(resumen)) {
     await ctx.reply(TEXTO_AYUDA_ALQUILER_ACTUAL, { reply_markup: tecladoAlquilerActual() });
+  }
+  if (resumen.debitos?.length) {
+    await ctx.reply("🔄 ¿Algún débito fue otro monto?", { reply_markup: tecladoDebitos(resumen.debitos) });
   }
 }
 
@@ -303,7 +313,30 @@ bot.on("message:text", async (ctx) => {
     for (const parte of dividirMensaje(directo)) await ctx.reply(parte, { reply_markup: menuPrincipalKeyboard });
     return;
   }
-  if (texto === "📊 Resumen") {
+  // Teclado fijo (v9.14.0).
+  if (texto === MENU.pagar || texto === MENU.cobro) {
+    const estado = estadoFlujoDe(chatId);
+    cancelarFlujo(estado);
+    await responderFlujo(ctx, await iniciarFlujo(estado, texto === MENU.pagar ? "pagar_gasto" : "crear_recibo"));
+    return;
+  }
+  if (texto === MENU.cuentas) {
+    const { texto: t, teclado } = await responderConsulta("cq:cta");
+    const partes = dividirMensaje(t);
+    for (let i = 0; i < partes.length; i++) {
+      await ctx.reply(partes[i]!, i === partes.length - 1 ? { reply_markup: teclado } : undefined);
+    }
+    return;
+  }
+  if (texto === MENU.corregir) {
+    await ctx.reply("¿Qué querés corregir?", { reply_markup: tecladoModificar() });
+    return;
+  }
+  if (texto === MENU.mas) {
+    await ctx.reply(TEXTO_MAS, { reply_markup: tecladoMas() });
+    return;
+  }
+  if (texto === MENU.hoy || texto === "📊 Resumen") {
     try {
       await enviarAgenda(ctx);
     } catch (error) {
@@ -352,12 +385,9 @@ bot.on("callback_query:data", async (ctx) => {
       return;
     }
     if (accion !== "iniciar" && otraCarga) {
-      await ctx.reply(
-        "Ese botón es de una carga que ya terminó o se canceló. Empezala de nuevo desde ➕ Nueva carga.",
-        {
-          reply_markup: menuPrincipalKeyboard,
-        },
-      );
+      await ctx.reply("Ese botón es de una carga que ya terminó o se canceló. Empezala de nuevo desde el menú.", {
+        reply_markup: menuPrincipalKeyboard,
+      });
       return;
     }
     if (accion === "iniciar" && valor) {
@@ -371,6 +401,21 @@ bot.on("callback_query:data", async (ctx) => {
       return;
     }
     await responderFlujo(ctx, await procesarSeleccion(estadoFlujo, accion, valor));
+    return;
+  }
+
+  // "⚙️ Más": temas con sus botones, sin OpenAI.
+  if (esCallbackMas(datos)) {
+    try {
+      const { texto, teclado } = await responderMas(datos);
+      const partes = dividirMensaje(texto);
+      for (let i = 0; i < partes.length; i++) {
+        await ctx.reply(partes[i]!, i === partes.length - 1 ? { reply_markup: teclado } : undefined);
+      }
+    } catch (error) {
+      console.error("Error en el menú Más:", error);
+      await ctx.reply("No pude abrir ese menú. Revisá la conexión a la base de datos.");
+    }
     return;
   }
 

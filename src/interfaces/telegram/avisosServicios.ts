@@ -29,6 +29,16 @@ export function tecladoAviso(v: { servicioId: string; periodo: string }): Inline
     .text("📅 Cambió la fecha", `${PREFIJO}fec:${ref}`);
 }
 
+/** Un botón "✏️ <servicio>: fue otro monto" por cada débito automático (se agregan al teclado dado). */
+export function tecladoDebitos(
+  debitos: { servicioId: string; periodo: string; nombre: string }[],
+  teclado = new InlineKeyboard(),
+): InlineKeyboard {
+  for (const d of debitos)
+    teclado.row().text(`✏️ ${d.nombre}: fue otro monto`, `${PREFIJO}deb:${d.servicioId}:${d.periodo}`);
+  return teclado;
+}
+
 export type ResultadoServicio =
   | { tipo: "respuesta"; texto: string }
   | { tipo: "flujo"; flowId: FlowId; datos: DatosFlujo };
@@ -39,6 +49,18 @@ export async function resolverCallbackServicio(datos: string): Promise<Resultado
   const v = servicioId ? await serviciosService.obtener(servicioId, periodo) : undefined;
   if (!v || !servicioId)
     return { tipo: "respuesta", texto: "No encontré ese vencimiento. Puede que lo hayas dado de baja." };
+
+  if (accion === "deb") {
+    return {
+      tipo: "flujo",
+      flowId: "corregir_debito",
+      datos: {
+        servicio_id: servicioId,
+        periodo: v.periodo,
+        [etiquetaKey("servicio_id")]: nombreServicio(v.nombre, v.propiedad),
+      },
+    };
+  }
 
   if (accion === "pag") {
     if (v.fechaPago) {

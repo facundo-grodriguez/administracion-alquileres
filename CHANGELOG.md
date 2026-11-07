@@ -2,6 +2,33 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.14.0] — 2026-11-07 — Menú más simple
+> 📱 Teclado nuevo: 📊 Hoy · ✅ Pagar · 📒 Mis cuentas · ✏️ Corregir · 💰 Cobro alquiler · ⚙️ Más
+> ⚙️ En Más, todo lo demás por tema: 🏠 Alquileres, 💡 Gastos y servicios, ➕ Altas y la planilla
+> 🧾 ✏️ Corregir → 📅 Vencimiento → "La fecha en que lo pagué" corrige la fecha del último pago
+> ⬅️ Botón "Atrás" en cada pregunta: si te equivocás de botón, volvés sin cancelar todo
+> 📋 Las listas para elegir muestran hasta 30 opciones (antes 8)
+> 🔄 Vencimientos que "se debitan solos": no te avisan, quedan pagados el día que vencen y la agenda te los muestra con "✏️ Fue otro monto"
+
+El teclado fijo deja lo de todos los días a un toque: la agenda, pagar (gastos y servicios en una sola
+lista), las cuentas, corregir lo cargado (ahora también la cuenta del mes) y registrar el cobro del
+alquiler. "⚙️ Más" abre los temas con lo que se consulta y lo que se carga de cada uno, sin IA. Los
+botones del teclado anterior siguen andando hasta que se actualice el teclado del chat.
+
+En todas las cargas guiadas, "⬅️ Atrás" (o escribir "atrás") vuelve a la pregunta anterior y borra esa
+respuesta; en la primera pregunta de un alta inline vuelve al flujo de arriba. El listado inicial de
+un paso "entidad" pasa de 8 a 30 opciones y la búsqueda de 5 a 10.
+
+Débito automático: al agendar un vencimiento (o en ✏️ Corregir → 📅 Vencimiento → 🔄 Se debita solo)
+se elige si se paga a mano o se debita solo. Los que se debitan no aparecen en la agenda ni en "sin
+pagar"; el día que vencen se marcan pagados con su monto (los de una propiedad cargan el gasto) y la
+agenda muestra "🔄 Se debitó solo" con un botón por cada uno para corregir el monto de ese mes y,
+si sigue así, el de los meses que vienen. También ✏️ Corregir → 📅 Vencimiento → "💲 Cuánto pagué"
+corrige el monto del último mes pagado. Columna `debito_desde` (migración 0010, se aplica sola).
+
+Nueva acción `fecha_pago` en `modificar_vencimiento_servicio` y en su flujo: cambia la fecha de pago del
+último mes pagado y, si es de una propiedad, también la del gasto cargado.
+
 ## [9.13.1] — 2026-11-07 — Lo reservado cuenta como gastado
 > 🧾 En las cuentas, lo reservado de cada rubro ya cuenta como gasto: sueldo − gastos = sobra
 > ✏️ Si un mes fue distinto, se modifica solo ese rubro ("✏️ Este mes fue distinto")

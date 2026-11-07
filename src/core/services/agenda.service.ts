@@ -1,11 +1,14 @@
 import { formatoFechaAR, hoyISO, sumarDiasISO } from "../util/fecha.js";
 import { formatoARS } from "../util/formato.js";
 import * as pagosService from "./pagos.service.js";
+import * as serviciosService from "./serviciosVencimiento.service.js";
 import * as vencimientosService from "./vencimientos.service.js";
 
 export type ResumenAgenda = {
   cobrosPendientes: Awaited<ReturnType<typeof pagosService.resumenCobrosDelMes>>;
   vencimientos: Awaited<ReturnType<typeof vencimientosService.listarVencimientos>>;
+  /** Lo que se debitó solo hoy (v9.14.0). */
+  debitos?: serviciosService.VencimientoServicio[];
 };
 
 /**
@@ -14,6 +17,8 @@ export type ResumenAgenda = {
  */
 export async function obtenerResumenAgenda(horizonteDias = 30): Promise<ResumenAgenda> {
   const hasta = sumarDiasISO(hoyISO(), horizonteDias);
+  // Primero los débitos automáticos: quedan pagados antes de armar el resto.
+  const debitos = await serviciosService.debitosParaMostrar();
 
   const [cobros, vencimientos] = await Promise.all([
     pagosService.resumenCobrosDelMes(),
@@ -22,7 +27,7 @@ export async function obtenerResumenAgenda(horizonteDias = 30): Promise<ResumenA
 
   const cobrosPendientes = cobros.filter((c) => c.estado !== "pagado");
 
-  return { cobrosPendientes, vencimientos };
+  return { cobrosPendientes, vencimientos, debitos };
 }
 
 /** true si hay contratos con la actualización de alquiler ya vencida (para ofrecer el botón de cargarla). */
@@ -39,12 +44,21 @@ function diasTexto(diasRestantes: number): string {
 
 export function formatearResumenAgenda(resumen: ResumenAgenda): string {
   const { cobrosPendientes, vencimientos } = resumen;
+  const debitos = resumen.debitos ?? [];
+  const bloqueDebitos = debitos.length
+    ? `🔄 Se debitó solo (${debitos.length}):\n${debitos
+        .map((d) => `  • ${d.nombre} — ${d.propiedad ?? "Personal"}${d.monto ? ` — ${formatoARS(d.monto)}` : ""}`)
+        .join("\n")}\nSi alguno fue otro monto, tocá su botón ✏️.`
+    : undefined;
 
   if (cobrosPendientes.length === 0 && vencimientos.length === 0) {
-    return `📅 Agenda (${formatoFechaAR(hoyISO())})\n\nNo hay nada pendiente. Todo al día. ✅`;
+    return [`📅 Agenda (${formatoFechaAR(hoyISO())})`, "No hay nada pendiente. Todo al día. ✅", bloqueDebitos]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   const bloques: string[] = [`📅 Agenda (${formatoFechaAR(hoyISO())})`];
+  if (bloqueDebitos) bloques.push(bloqueDebitos);
 
   if (cobrosPendientes.length > 0) {
     const lineas = cobrosPendientes.map((c) => {

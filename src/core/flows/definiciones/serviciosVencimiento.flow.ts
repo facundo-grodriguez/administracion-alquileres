@@ -22,6 +22,16 @@ const OPCIONES_TERMINA = [
 
 const PREGUNTA_HASTA = "¿Cuál es el último mes que vence? (MM/AAAA, ej. 12/2026)";
 
+const OPCIONES_DEBITO = [
+  { valor: "si", etiqueta: "🔄 Se debita solo (no me avises)" },
+  { valor: "no", etiqueta: "🔔 Lo pago yo (avisame)" },
+];
+
+const OPCIONES_DE_AHORA = [
+  { valor: "si", etiqueta: "✅ Sí, de ahora en más" },
+  { valor: "no", etiqueta: "Solo ese mes" },
+];
+
 const filtrar = <T extends { etiqueta: string }>(items: T[], query: string) => {
   const q = query.trim().toLowerCase();
   return items.filter((c) => !q || c.etiqueta.toLowerCase().includes(q));
@@ -78,6 +88,7 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
       campo: { tipo: "periodo" },
       saltar: (datos) => datos.termina !== "mes",
     },
+    { id: "debito", pregunta: () => "¿Cómo se paga?", campo: { tipo: "opciones", opciones: OPCIONES_DEBITO } },
     {
       id: "__confirmar",
       pregunta: (datos) =>
@@ -89,7 +100,9 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
           datos.monto ? `Monto aprox.: ${formatoARS(datos.monto as string)}` : null,
           datos.termina === "mes" ? `Última cuota: ${formatoPeriodoAR(datos.hasta as string)}` : null,
           "",
-          "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
+          datos.debito === "si"
+            ? "🔄 Se debita solo: no te aviso; el día que vence lo marco pagado."
+            : "Te aparece en la agenda de cada mañana hasta que lo marques como pagado.",
         ]
           .filter((l) => l !== null)
           .join("\n"),
@@ -103,6 +116,40 @@ export const crearVencimientoServicioFlow: DefinicionFlujo = {
       propiedad_id: datos.de_quien === "propiedad" || datos.propiedad_id ? (datos.propiedad_id as string) : undefined,
       monto: datos.monto as string | undefined,
       hasta_periodo: datos.termina === "mes" ? (datos.hasta as string) : undefined,
+      debito_automatico: datos.debito === "si",
+    }),
+};
+
+/** "✏️ Fue otro monto" desde la agenda (v9.14.0): corrige lo debitado ese mes. */
+export const corregirDebitoFlow: DefinicionFlujo = {
+  id: "corregir_debito",
+  titulo: "🔄 Débito",
+  etiqueta: (datos) => datos[etiquetaKey("servicio_id")] as string,
+  pasos: [
+    {
+      id: "monto",
+      pregunta: (datos) => `¿Cuánto se debitó de ${datos[etiquetaKey("servicio_id")] ?? "ese servicio"}?`,
+      campo: { tipo: "monto" },
+    },
+    {
+      id: "de_ahora",
+      pregunta: (datos) => `¿De ahora en más se debita ${formatoARS(datos.monto as string)}?`,
+      campo: { tipo: "opciones", opciones: OPCIONES_DE_AHORA },
+    },
+    {
+      id: "__confirmar",
+      pregunta: (datos) =>
+        `Confirmá: ${datos[etiquetaKey("servicio_id")]} de ${formatoPeriodoAR(datos.periodo as string)} — ${formatoARS(datos.monto as string)}${datos.de_ahora === "si" ? ", y de ahora en más ese monto" : ""}.`,
+      campo: { tipo: "confirmacion" },
+    },
+  ],
+  ejecutar: (datos) =>
+    modificarVencimientoServicioTool.run({
+      servicio_id: datos.servicio_id as string,
+      accion: "monto_pagado",
+      periodo: datos.periodo as string,
+      monto: datos.monto as string,
+      de_ahora_en_mas: datos.de_ahora === "si",
     }),
 };
 
@@ -274,6 +321,9 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
           { valor: "fecha_este_mes", etiqueta: "📅 La fecha de este mes" },
           { valor: "dia_fijo", etiqueta: "🔁 El día de todos los meses" },
           { valor: "monto", etiqueta: "💲 El monto" },
+          { valor: "fecha_pago", etiqueta: "🧾 La fecha en que lo pagué" },
+          { valor: "monto_pagado", etiqueta: "💲 Cuánto pagué (último mes)" },
+          { valor: "debito", etiqueta: "🔄 Se debita solo / lo pago yo" },
           { valor: "termina", etiqueta: "🔚 Cuándo termina (última cuota)" },
           { valor: "baja", etiqueta: "🗑️ Dar de baja" },
         ],
@@ -285,6 +335,36 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
         `¿Qué fecha trae la factura${datos.periodo ? ` de ${formatoPeriodoAR(datos.periodo as string)}` : ""}? (DD/MM/AAAA)`,
       campo: { tipo: "fecha" },
       saltar: (datos) => datos.accion !== "fecha_este_mes",
+    },
+    {
+      id: "monto_pagado",
+      pregunta: () => "¿Cuánto pagaste? (corrige el último mes pagado)",
+      campo: { tipo: "monto" },
+      saltar: (datos) => datos.accion !== "monto_pagado",
+    },
+    {
+      id: "de_ahora",
+      pregunta: (datos) => `¿De ahora en más es ${formatoARS(datos.monto_pagado as string)} por mes?`,
+      campo: { tipo: "opciones", opciones: OPCIONES_DE_AHORA },
+      saltar: (datos) => datos.accion !== "monto_pagado",
+    },
+    {
+      id: "debito_valor",
+      pregunta: () => "¿Cómo se paga?",
+      campo: { tipo: "opciones", opciones: OPCIONES_DEBITO },
+      saltar: (datos) => datos.accion !== "debito",
+    },
+    {
+      id: "monto_debito",
+      pregunta: () => "¿Cuánto se debita por mes? (Omitir deja el monto que tiene)",
+      campo: { tipo: "monto", opcional: true },
+      saltar: (datos) => datos.accion !== "debito" || datos.debito_valor !== "si",
+    },
+    {
+      id: "fecha_pago",
+      pregunta: () => "¿Qué día lo pagaste? (corrige el último mes pagado)",
+      campo: { tipo: "fecha", permitirHoy: true },
+      saltar: (datos) => datos.accion !== "fecha_pago",
     },
     {
       id: "dia",
@@ -327,6 +407,14 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
             return `Confirmá: ${servicio} pasa a vencer el día ${datos.dia} de cada mes.`;
           case "monto":
             return `Confirmá: ${servicio} — monto aprox. ${formatoARS(datos.monto as string)}.`;
+          case "fecha_pago":
+            return `Confirmá: el último pago de ${servicio} fue el ${formatoFechaAR(datos.fecha_pago as string)}.`;
+          case "monto_pagado":
+            return `Confirmá: el último pago de ${servicio} fue ${formatoARS(datos.monto_pagado as string)}${datos.de_ahora === "si" ? ", y de ahora en más es ese monto" : ""}.`;
+          case "debito":
+            return datos.debito_valor === "si"
+              ? `Confirmá: ${servicio} se debita solo${datos.monto_debito ? ` (${formatoARS(datos.monto_debito as string)})` : ""}. No te aviso más; el día que vence lo marco pagado.`
+              : `Confirmá: ${servicio} lo pagás vos. Te lo vuelvo a avisar en la agenda.`;
           case "termina":
             return datos.termina === "mes"
               ? `Confirmá: la última cuota de ${servicio} es ${formatoPeriodoAR(datos.hasta as string)}. Después no te aviso más y lo pagado queda en el seguimiento.`
@@ -341,11 +429,25 @@ export const editarVencimientoServicioFlow: DefinicionFlujo = {
   ejecutar: (datos) =>
     modificarVencimientoServicioTool.run({
       servicio_id: datos.servicio_id as string,
-      accion: datos.accion as "fecha_este_mes" | "dia_fijo" | "monto" | "termina" | "baja",
+      accion: datos.accion as
+        | "fecha_este_mes"
+        | "dia_fijo"
+        | "monto"
+        | "termina"
+        | "baja"
+        | "fecha_pago"
+        | "debito"
+        | "monto_pagado",
       periodo: datos.periodo as string | undefined,
-      fecha: datos.fecha as string | undefined,
+      fecha: (datos.accion === "fecha_pago" ? datos.fecha_pago : datos.fecha) as string | undefined,
       dia: datos.dia === undefined ? undefined : Number(datos.dia),
-      monto: datos.monto as string | undefined,
+      monto: (datos.accion === "monto_pagado"
+        ? datos.monto_pagado
+        : datos.accion === "debito"
+          ? datos.monto_debito
+          : datos.monto) as string | undefined,
+      debito_automatico: datos.accion === "debito" ? datos.debito_valor === "si" : undefined,
+      de_ahora_en_mas: datos.accion === "monto_pagado" ? datos.de_ahora === "si" : undefined,
       hasta_periodo: datos.accion === "termina" && datos.termina === "mes" ? (datos.hasta as string) : undefined,
     }),
 };

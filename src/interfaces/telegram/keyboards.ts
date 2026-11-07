@@ -2,18 +2,27 @@ import { InlineKeyboard, Keyboard } from "grammy";
 import type { ContextoTeclado } from "../../core/assistant/tools/sugerirBotones.tool.js";
 import type { ReferenciaEntidad } from "../../core/flows/types.js";
 
+// Teclado fijo (v9.14.0): lo de todos los días a un toque; el resto, por tema, en "⚙️ Más".
+export const MENU = {
+  hoy: "📊 Hoy",
+  pagar: "✅ Pagar",
+  cuentas: "📒 Mis cuentas",
+  corregir: "✏️ Corregir",
+  cobro: "💰 Cobro alquiler",
+  mas: "⚙️ Más",
+} as const;
+
 export const menuPrincipalKeyboard = new Keyboard()
-  .text("🏠 Propiedades")
-  .text("📄 Contratos")
+  .text(MENU.hoy)
+  .text(MENU.pagar)
   .row()
-  .text("💰 Pagos")
-  .text("➕ Nueva carga")
+  .text(MENU.cuentas)
+  .text(MENU.corregir)
   .row()
-  .text("📊 Resumen")
-  .text("🔎 Consultas")
-  .row()
-  .text("✏️ Modificar")
-  .resized();
+  .text(MENU.cobro)
+  .text(MENU.mas)
+  .resized()
+  .persistent();
 
 // Los botones del menú principal (Reply Keyboard) llegan como texto normal. Desde la etapa 9,
 // todos se resuelven sin IA: "➕ Nueva carga", "🔎 Consultas" y "✏️ Modificar" abren sus botones y el resto llama
@@ -21,6 +30,8 @@ export const menuPrincipalKeyboard = new Keyboard()
 // lista solo se usa para reconocer esas frases como "no es una interrupción real, es el menú" al
 // detectar si el usuario abandonó un flujo guiado a mitad de camino.
 export const ETIQUETAS_MENU_PRINCIPAL = [
+  ...Object.values(MENU),
+  // Las del teclado anterior (hasta v9.13): siguen andando si quedó el teclado viejo en el chat.
   "🏠 Propiedades",
   "📄 Contratos",
   "💰 Pagos",

@@ -14,6 +14,7 @@ import {
   cuandoVence,
   iconoServicio,
   nombreServicio,
+  periodoAnterior,
   periodoPendiente,
   periodoSiguiente,
   type TipoAviso,
@@ -42,6 +43,8 @@ export type VencimientoServicio = {
   /** Último mes del servicio (última cuota o mes de la baja), o null si sigue sin fin. */
   hastaPeriodo: string | null;
   activo: boolean;
+  /** Se debita solo (v9.14.0): no avisa y se marca pagado el día que vence. */
+  debito: boolean;
 };
 
 /** El vencimiento de un servicio en un mes (con lo pagado, si se pagó). */
@@ -67,6 +70,7 @@ function armar(servicio: ServicioConDetalle, periodo: string, hoy: string): Venc
     diasRestantes: diasEntreISO(hoy, fechaVencimiento),
     hastaPeriodo: servicio.hastaPeriodo,
     activo: servicio.activo,
+    debito: Boolean(servicio.debitoDesde),
   };
 }
 
@@ -100,7 +104,7 @@ export async function sinPagarHasta(hasta: string, hoy = hoyISO()): Promise<Venc
   const items: VencimientoServicio[] = [];
   for (const periodo of periodosEntre(hoy.slice(0, 7), hasta.slice(0, 7))) {
     for (const s of servicios) {
-      if (terminado(s, periodo)) continue;
+      if (terminado(s, periodo) || s.debitoDesde) continue; // los que se debitan solos no se avisan
       const item = armar(s, periodo, hoy);
       if (item.fechaPago || item.fechaVencimiento > hasta) continue;
       if (item.fechaVencimiento < hoy && periodo !== hoy.slice(0, 7)) continue;
@@ -160,6 +164,7 @@ export async function avisosDeHoy(
   const avisos: { item: VencimientoServicio; tipo: TipoAviso }[] = [];
   const actual = hoy.slice(0, 7);
   for (const s of servicios) {
+    if (s.debitoDesde) continue;
     for (const periodo of [actual, periodoSiguiente(actual)]) {
       if (terminado(s, periodo)) continue;
       const item = armar(s, periodo, hoy);
@@ -187,6 +192,7 @@ export async function crear(datos: {
   diaVencimiento: number;
   monto?: string | null;
   hastaPeriodo?: string | null;
+  debitoDesde?: string | null;
 }) {
   const creado = await serviciosRepo.crear(datos);
   return (await obtener(creado.id))!;
@@ -289,6 +295,87 @@ export async function cambiarFechaDelMes(servicioId: string, periodo: string, fe
 export async function cambiarDia(servicioId: string, dia: number) {
   await serviciosRepo.actualizar(servicioId, { diaVencimiento: dia });
   return obtener(servicioId);
+}
+
+/**
+ * Débitos automáticos (v9.14.0): marca pagados, con la fecha del vencimiento, los que se debitan
+ * solos y ya vencieron (este mes y el anterior, desde que se activó). Los de una propiedad cargan su
+ * gasto. Devuelve los que marcó recién.
+ */
+export async function procesarDebitos(hoy = hoyISO()): Promise<VencimientoServicio[]> {
+  const marcados: VencimientoServicio[] = [];
+  const actual = hoy.slice(0, 7);
+  for (const s of await serviciosRepo.listarActivos()) {
+    if (!s.debitoDesde) continue;
+    for (const periodo of [periodoAnterior(actual), actual]) {
+      if (terminado(s, periodo) || !correspondeAlPeriodo(s, periodo, tieneDatos(s, periodo))) continue;
+      const item = armar(s, periodo, hoy);
+      if (item.fechaPago || item.fechaVencimiento > hoy || item.fechaVencimiento < s.debitoDesde) continue;
+      const pagado = await marcarPagado(s.id, periodo, item.fechaVencimiento);
+      if (pagado) marcados.push(pagado);
+    }
+  }
+  return marcados;
+}
+
+/** Lo que se debitó hoy (o recién, si el bot estuvo apagado): para mostrarlo en la agenda. */
+export async function debitosParaMostrar(hoy = hoyISO()): Promise<VencimientoServicio[]> {
+  const recien = await procesarDebitos(hoy);
+  const deHoy = (await delMes(hoy.slice(0, 7), hoy)).filter(
+    (v) => v.debito && v.fechaPago && v.fechaVencimiento === hoy,
+  );
+  const vistos = new Set<string>();
+  return [...recien, ...deHoy]
+    .filter((v) => {
+      const clave = `${v.servicioId}:${v.periodo}`;
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    })
+    .sort(porFecha);
+}
+
+/** Activa o desactiva el débito automático. Al activarlo puede fijar el monto que se debita. */
+export async function cambiarDebito(servicioId: string, activo: boolean, monto?: string, hoy = hoyISO()) {
+  await serviciosRepo.actualizar(servicioId, { debitoDesde: activo ? hoy : null, ...(monto ? { monto } : {}) });
+  return obtener(servicioId, undefined, hoy);
+}
+
+/**
+ * Corrige cuánto se pagó (o debitó) un mes: por defecto el último pagado. Si es de una propiedad,
+ * corrige también el gasto. `deAhoraEnMas` cambia además el monto de los meses que vienen.
+ */
+export async function cambiarMontoPagado(
+  servicioId: string,
+  monto: string,
+  opciones: { periodo?: string; deAhoraEnMas?: boolean } = {},
+) {
+  const servicio = await serviciosRepo.obtenerPorId(servicioId);
+  if (!servicio) return undefined;
+  const periodo =
+    opciones.periodo ??
+    servicio.meses.filter((m) => m.fechaPago).sort((a, b) => b.periodo.localeCompare(a.periodo))[0]?.periodo;
+  if (!periodo) return undefined;
+  const actual = armar(servicio, periodo, hoyISO());
+  if (!actual.fechaPago) return undefined;
+  const v = await marcarPagado(servicioId, periodo, actual.fechaPago, monto);
+  if (opciones.deAhoraEnMas) await serviciosRepo.actualizar(servicioId, { monto });
+  return v;
+}
+
+/**
+ * Corrige la fecha en que se pagó el último mes pagado (y la del gasto de la propiedad, si tiene).
+ * Devuelve ese mes, o undefined si todavía no hay ninguno pagado.
+ */
+export async function cambiarFechaPago(servicioId: string, fechaPago: string) {
+  const servicio = await serviciosRepo.obtenerPorId(servicioId);
+  const mes = servicio?.meses.filter((m) => m.fechaPago).sort((a, b) => b.periodo.localeCompare(a.periodo))[0];
+  if (!mes) return undefined;
+  await serviciosRepo.guardarMes(servicioId, mes.periodo, { fechaPago });
+  if (mes.gastoId && (await gastosRepo.obtenerPorId(mes.gastoId))) {
+    await gastosService.corregir({ gastoId: mes.gastoId, fechaPago });
+  }
+  return obtener(servicioId, mes.periodo);
 }
 
 export async function cambiarMonto(servicioId: string, monto: string) {
@@ -408,7 +495,7 @@ export function textoDelMes(
   if (items.length === 0) {
     return periodo < hoy.slice(0, 7)
       ? `${titulo}\n\nNo había servicios agendados ese mes.`
-      : "Todavía no cargaste vencimientos de servicios. Sumalos desde ➕ Nueva carga → 📅 Vencimiento.";
+      : "Todavía no cargaste vencimientos de servicios. Sumalos desde ⚙️ Más → 💡 Gastos y servicios → 📅 Agendar vencimiento.";
   }
   // Primero lo que falta pagar y abajo, aparte, lo ya pagado: que no se mezclen.
   const pendientes = items.filter((v) => !v.fechaPago).sort(porFecha);

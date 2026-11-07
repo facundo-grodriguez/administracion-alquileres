@@ -12,6 +12,7 @@ import { editarPropiedadFlow } from "./editarPropiedad.flow.js";
 import { corregirGastoFlow, pagarGastoFlow } from "./gastosFlujos.js";
 import { registrarAlquilerActualFlow } from "./registrarAlquilerActual.flow.js";
 import {
+  corregirDebitoFlow,
   crearVencimientoServicioFlow,
   editarVencimientoServicioFlow,
   pagarServicioFlow,
@@ -35,6 +36,7 @@ export const FLUJOS: Record<FlowId, DefinicionFlujo> = {
   editar_vencimiento_servicio: editarVencimientoServicioFlow,
   cargar_cuenta: cargarCuentaFlow,
   configurar_cuenta: configurarCuentaFlow,
+  corregir_debito: corregirDebitoFlow,
 };
 
 /** Los flujos que se ofrecen como accesos directos desde "➕ Nueva carga" (altas). */
@@ -60,4 +62,5 @@ export const FLUJOS_MODIFICAR: { flowId: FlowId; titulo: string }[] = [
   { flowId: "corregir_gasto", titulo: "💡 Gasto" },
   { flowId: "registrar_alquiler_actual", titulo: "⚡ Alquiler actual" },
   { flowId: "editar_vencimiento_servicio", titulo: "📅 Vencimiento" },
+  { flowId: "cargar_cuenta", titulo: "📒 Cuenta del mes" },
 ];

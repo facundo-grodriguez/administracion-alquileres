@@ -19,7 +19,7 @@ async function ejecutar(datos: Record<string, unknown>): Promise<string> {
     medioPago: datos.medio_pago === "omitir" ? undefined : (datos.medio_pago as string | undefined),
   });
   if (resultado.tipo === "rango_invalido") {
-    return `No cargué nada: ${resultado.motivo}. Volvé a intentarlo desde ➕ Nueva carga → 📚 Pagos anteriores.`;
+    return `No cargué nada: ${resultado.motivo}. Volvé a intentarlo desde ⚙️ Más → ➕ Altas → 📚 Pagos anteriores.`;
   }
   const lineas = [`Listo, cargué ${resultado.cargados.length} mes(es) como pagados:`];
   for (const p of resultado.cargados) lineas.push(`  • ${formatoPeriodoAR(p.periodo)}: ${formatoARS(p.monto)}`);

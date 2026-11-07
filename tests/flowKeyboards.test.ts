@@ -166,6 +166,7 @@ describe("tecladoModificar", () => {
       "flujo:iniciar:corregir_gasto",
       "flujo:iniciar:registrar_alquiler_actual",
       "flujo:iniciar:editar_vencimiento_servicio",
+      "flujo:iniciar:cargar_cuenta",
     ]);
   });
 });
