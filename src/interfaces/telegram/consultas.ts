@@ -260,13 +260,16 @@ async function cuentasDelMes(periodo?: string): Promise<RespuestaConsulta> {
   const c = await cuentasService.cuentasDelMes(p, hoy);
   const teclado = new InlineKeyboard();
   if (c.gastos.length + c.ingresos.length > 0) {
-    teclado.text("➕ Cargar", "flujo:iniciar:cargar_cuenta").text("⚙️ Rubros", "flujo:iniciar:configurar_cuenta").row();
+    teclado
+      .text("✏️ Este mes fue distinto", "flujo:iniciar:cargar_cuenta")
+      .text("⚙️ Rubros", "flujo:iniciar:configurar_cuenta")
+      .row();
     teclado.text(`⬅️ ${formatoPeriodoAR(periodoAnterior(p))}`, `${PREFIJO}cta:${periodoAnterior(p)}`);
     teclado.text(`➡️ ${formatoPeriodoAR(periodoSiguiente(p))}`, `${PREFIJO}cta:${periodoSiguiente(p)}`).row();
   } else {
     teclado.text("⚙️ Armar rubros", "flujo:iniciar:configurar_cuenta").row();
   }
-  return { texto: cuentasService.textoCuentas(c, hoy), teclado: botonOtraConsulta(teclado) };
+  return { texto: cuentasService.textoCuentas(c), teclado: botonOtraConsulta(teclado) };
 }
 
 /** Resuelve un botón del menú de Consultas. */

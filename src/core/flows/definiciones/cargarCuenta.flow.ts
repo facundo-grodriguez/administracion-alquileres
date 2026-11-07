@@ -1,5 +1,5 @@
 // Flujos de las cuentas personales (v9.13.0), sin IA:
-// "📒 Cuenta del mes" carga lo de un mes de un rubro; "⚙️ Rubros de cuentas" agrega, cambia,
+// "📒 Cuenta del mes" modifica un rubro el mes que fue distinto a lo reservado; "⚙️ Rubros de cuentas" agrega, cambia,
 // vincula o saca rubros.
 import { cargarCuentaTool, configurarCuentaTool } from "../../assistant/tools/cuentas.tool.js";
 import * as cuentasRepo from "../../repositories/cuentas.repository.js";
@@ -27,39 +27,23 @@ export const cargarCuentaFlow: DefinicionFlujo = {
   pasos: [
     {
       id: "rubro",
-      pregunta: () => "¿De qué rubro? (los vinculados a un vencimiento se cargan solos cuando los pagás)",
-      // los vinculados a un vencimiento se cargan solos al pagarlos
-      campo: { tipo: "entidad", buscar: (q) => rubros(q, (r) => !r.servicioId), maxListado: 20 },
-    },
-    {
-      id: "modo",
-      pregunta: () => "¿Es el total del mes o lo sumo a lo que ya habías cargado?",
-      campo: {
-        tipo: "opciones",
-        opciones: [
-          { valor: "total", etiqueta: "🔁 Es el total del mes" },
-          { valor: "sumar", etiqueta: "➕ Sumarlo a lo cargado" },
-        ],
-      },
+      pregunta: () => "¿Qué rubro fue distinto este mes? (lo reservado ya cuenta como gastado)",
+      campo: { tipo: "entidad", buscar: (q) => rubros(q), maxListado: 20 },
     },
     {
       id: "monto",
-      pregunta: (datos) => (datos.modo === "sumar" ? "¿Cuánto sumo?" : "¿Cuánto en total este mes?"),
+      pregunta: () => "¿Cuánto fue este mes?",
       campo: { tipo: "monto" },
     },
     {
       id: "__confirmar",
       pregunta: (datos) =>
-        `Confirmá: ${datos.rubro} de este mes — ${datos.modo === "sumar" ? "sumar " : ""}${formatoARS(datos.monto as string)}.`,
+        `Confirmá: ${datos.rubro} de este mes — ${formatoARS(datos.monto as string)} (en vez de lo reservado).`,
       campo: { tipo: "confirmacion" },
     },
   ],
   ejecutar: (datos) =>
-    cargarCuentaTool.run({
-      rubro: datos.rubro as string,
-      monto: datos.monto as string,
-      modo: datos.modo === "sumar" ? "sumar" : "total",
-    }),
+    cargarCuentaTool.run({ rubro: datos.rubro as string, monto: datos.monto as string, modo: "total" }),
 };
 
 const ACCIONES = [
@@ -89,9 +73,9 @@ function textoConfirmar(datos: DatosFlujo): string {
     case "monto":
       return `Confirmá: ${nombre} pasa a ${formatoARS(datos.previsto as string)} por mes.`;
     case "vincular":
-      return `Confirmá: vincular ${nombre} al vencimiento ${datos.vencimiento}. Lo gastado va a ser lo que pagues ahí.`;
+      return `Confirmá: vincular ${nombre} al vencimiento ${datos.vencimiento}. Cuando lo pagues, cuenta lo pagado en vez de lo reservado.`;
     case "desvincular":
-      return `Confirmá: separar ${nombre} de su vencimiento. Queda como reserva y lo gastado lo cargás vos.`;
+      return `Confirmá: separar ${nombre} de su vencimiento. Cuenta lo reservado y, si un mes es distinto, lo modificás vos.`;
     default:
       return `Confirmá: sacar ${nombre} de tus cuentas (lo ya cargado queda guardado).`;
   }
@@ -146,7 +130,7 @@ export const configurarCuentaFlow: DefinicionFlujo = {
     },
     {
       id: "vencimiento",
-      pregunta: () => "¿A qué vencimiento? (lo gastado del rubro va a ser lo que pagues ahí)",
+      pregunta: () => "¿A qué vencimiento? (cuando lo pagues, cuenta lo pagado en vez de lo reservado)",
       campo: { tipo: "entidad", buscar: vencimientosPersonales, maxListado: 20 },
       saltar: (datos) => datos.accion !== "vincular",
     },

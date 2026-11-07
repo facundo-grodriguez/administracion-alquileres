@@ -41,10 +41,10 @@ export const configurarCuentaTool = defineTool({
 export const cargarCuentaTool = defineTool({
   name: "cargar_cuenta",
   description:
-    "Carga en las cuentas personales lo de un mes de un rubro: modo 'total' (lo gastado ese mes, reemplaza lo que " +
-    "había: 'este mes en compras gasté 230000', 'cobré 1020935 de sueldo'), 'sumar' (se agrega: 'sumá 15000 a " +
-    "nafta') o 'previsto' (otro previsto solo para ese mes: 'en diciembre preveo 300000 de compras'). Los rubros " +
-    "vinculados a un vencimiento toman solos lo pagado; no hace falta cargarlos.",
+    "Lo reservado de cada rubro ya cuenta como gastado; esto lo modifica solo para un mes cuando fue distinto: " +
+    "modo 'total' (lo que fue ese mes: 'este mes en compras gasté 230000', 'cobré 1050000 de sueldo'), 'sumar' (se " +
+    "agrega a lo que cuenta ese mes: 'sumá 15000 a nafta') o 'previsto' (otra reserva solo para ese mes: 'en " +
+    "diciembre reservo 300000 para compras').",
   inputSchema: z.object({
     rubro: z.string(),
     monto: z.string().describe("Ej '230000'"),
@@ -55,11 +55,10 @@ export const cargarCuentaTool = defineTool({
     const r = await cuentas.cargar(input);
     if (!r) return `No tengo el rubro "${input.rubro}" en tus cuentas. ¿Lo agrego? (con configurar_cuenta)`;
     const t = r.cuentas.totales;
-    const valor = r.modo === "previsto" ? r.linea.previsto : r.linea.real;
     return [
-      `Listo: ${r.rubro} de ${formatoPeriodoAR(r.periodo)} — ${r.modo === "previsto" ? "previsto " : ""}${formatoARS(String(valor ?? 0))}.`,
-      `✅ Gastado en el mes: ${formatoARS(String(t.gastado))} de ${formatoARS(String(t.previsto))} previstos.`,
-      r.cuentas.ingresos.length > 0 ? `💰 Sobraría: ${formatoARS(String(t.sobraProyectada))}.` : null,
+      `Listo: ${r.rubro} de ${formatoPeriodoAR(r.periodo)} — ${formatoARS(String(r.linea.monto))}.`,
+      `🧾 Gastos del mes: ${formatoARS(String(t.gastos))}.`,
+      r.cuentas.ingresos.length > 0 ? `💰 Sobra: ${formatoARS(String(t.sobra))}.` : null,
     ]
       .filter(Boolean)
       .join("\n");
@@ -69,7 +68,7 @@ export const cargarCuentaTool = defineTool({
 export const verCuentasTool = defineTool({
   name: "ver_cuentas",
   description:
-    "Muestra las cuentas personales de un mes: sueldo, gastos previstos, cuánto sobra, lo gastado hasta ahora y " +
+    "Muestra las cuentas personales de un mes: sueldo, gastos (lo reservado o lo modificado), cuánto sobra y " +
     "cada rubro. Usar para '¿cómo vengo este mes?', '¿cuánto me sobra?', 'mis cuentas'.",
   inputSchema: z.object({ periodo }),
   run: async (input) => cuentas.textoCuentas(await cuentas.cuentasDelMes(input.periodo)),

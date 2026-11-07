@@ -1,7 +1,7 @@
 // Cuentas personales (v9.13.0): el presupuesto del mes del administrador, como su planilla
-// "Cuentas": rubros con un monto previsto (Compras, Nafta, Seguro...), el sueldo, y cuánto sobra.
-// Lo real de cada rubro es el total que se carga ese mes o, si está vinculado a un vencimiento
-// personal (Seguro auto, Claude...), lo que se pagó ahí. No toca nada de las propiedades.
+// "Cuentas": rubros con lo reservado por mes (Compras, Nafta, Seguro...), el sueldo, y cuánto sobra.
+// Lo reservado cuenta como gastado; solo si un mes fue distinto se modifica a mano (o, si el rubro
+// está vinculado a un vencimiento personal, toma lo que se pagó ahí). No toca nada de las propiedades.
 import * as cuentasRepo from "../repositories/cuentas.repository.js";
 import * as serviciosRepo from "../repositories/serviciosVencimiento.repository.js";
 import { formatoFechaAR, formatoPeriodoAR, hoyISO } from "../util/fecha.js";
@@ -16,9 +16,12 @@ export type LineaCuenta = {
   rubroId: string;
   nombre: string;
   tipo: TipoRubro;
+  /** Lo reservado ese mes. */
   previsto: number | null;
-  /** Lo que se gastó (o cobró) de verdad ese mes, si ya se sabe. */
+  /** Si ese mes fue distinto: lo modificado a mano (o lo pagado en el vencimiento vinculado). */
   real: number | null;
+  /** Lo que cuenta en el mes: lo modificado o, si no, lo reservado. */
+  monto: number;
   /** Si está vinculado a un vencimiento: cuándo vence y si se pagó. */
   vencimiento?: { fecha: string; pagado: boolean };
   vinculadoA?: string;
@@ -30,12 +33,10 @@ export type CuentasDelMes = {
   ingresos: LineaCuenta[];
   totales: {
     ingreso: number;
-    previsto: number;
-    gastado: number;
-    /** Lo real donde ya se sabe y lo previsto en el resto. */
-    proyectado: number;
-    sobraPrevista: number;
-    sobraProyectada: number;
+    /** Lo reservado, sin las modificaciones del mes. */
+    reservado: number;
+    gastos: number;
+    sobra: number;
   };
 };
 
@@ -54,6 +55,7 @@ function linea(r: Rubro, periodo: string, hoy: string): LineaCuenta {
     tipo: r.tipo === "ingreso" ? "ingreso" : "gasto",
     previsto,
     real,
+    monto: real ?? previsto ?? 0,
     vencimiento: v ? { fecha: v.fechaVencimiento, pagado: Boolean(v.fechaPago) } : undefined,
     vinculadoA: r.servicio?.nombre,
   };
@@ -69,22 +71,13 @@ export async function cuentasDelMes(periodo?: string, hoy = hoyISO()): Promise<C
   const gastos = lineas.filter((l) => l.tipo === "gasto");
   const ingresos = lineas.filter((l) => l.tipo === "ingreso");
   const suma = (ls: LineaCuenta[], f: (l: LineaCuenta) => number | null) => ls.reduce((acc, l) => acc + (f(l) ?? 0), 0);
-  const ingreso = suma(ingresos, (l) => l.real ?? l.previsto);
-  const previsto = suma(gastos, (l) => l.previsto);
-  const gastado = suma(gastos, (l) => l.real);
-  const proyectado = suma(gastos, (l) => l.real ?? l.previsto);
+  const ingreso = suma(ingresos, (l) => l.monto);
+  const total = suma(gastos, (l) => l.monto);
   return {
     periodo: p,
     gastos,
     ingresos,
-    totales: {
-      ingreso,
-      previsto,
-      gastado,
-      proyectado,
-      sobraPrevista: ingreso - previsto,
-      sobraProyectada: ingreso - proyectado,
-    },
+    totales: { ingreso, reservado: suma(gastos, (l) => l.previsto), gastos: total, sobra: ingreso - total },
   };
 }
 
@@ -237,8 +230,8 @@ export async function aplicarLista(texto: string): Promise<string[]> {
 export type ModoCarga = "total" | "sumar" | "previsto";
 
 /**
- * Carga lo de un mes: "total" (lo gastado/cobrado ese mes, reemplaza), "sumar" (se agrega a lo que
- * había) o "previsto" (otro previsto solo para ese mes).
+ * Modifica un mes: "total" (lo que fue ese mes, en vez de lo reservado), "sumar" (se agrega a lo que
+ * cuenta ese mes) o "previsto" (otra reserva solo para ese mes).
  */
 export async function cargar(input: { rubro: string; monto: string; periodo?: string; modo?: ModoCarga }) {
   const rubro = await buscarRubro(input.rubro);
@@ -248,7 +241,9 @@ export async function cargar(input: { rubro: string; monto: string; periodo?: st
   if (modo === "previsto") {
     await cuentasRepo.guardarMes(rubro.id, periodo, { previsto: input.monto });
   } else {
-    const antes = modo === "sumar" ? (num((await cuentasRepo.obtenerMes(rubro.id, periodo))?.real) ?? 0) : 0;
+    const c = await cuentasDelMes(periodo);
+    const actual = [...c.gastos, ...c.ingresos].find((l) => l.rubroId === rubro.id);
+    const antes = modo === "sumar" ? (actual?.monto ?? 0) : 0;
     await cuentasRepo.guardarMes(rubro.id, periodo, { real: String(antes + Number(input.monto)) });
   }
   const cuentas = await cuentasDelMes(periodo);
@@ -261,17 +256,12 @@ export async function cargar(input: { rubro: string; monto: string; periodo?: st
 const $ = (n: number) => formatoARS(String(n));
 const diaMes = (iso: string) => formatoFechaAR(iso).slice(0, 5);
 
-/** "• ✅ Compras — $ 230.000 (previsto $ 250.000)" y parecidos. */
+/** "• Compras — $ 250.000" o, si ese mes fue distinto, "• ✏️ Compras — $ 230.000 (reservado $ 250.000)". */
 export function lineaCuenta(l: LineaCuenta): string {
-  const previsto = l.previsto !== null ? $(l.previsto) : "sin previsto";
-  if (l.real !== null) {
-    const extra = l.previsto !== null && l.previsto !== l.real ? ` (previsto ${previsto})` : "";
-    return `• ✅ ${l.nombre} — ${$(l.real)}${extra}`;
-  }
-  if (l.vencimiento && !l.vencimiento.pagado) {
-    return `• 🕓 ${l.nombre} — ${previsto} · vence ${diaMes(l.vencimiento.fecha)}`;
-  }
-  return `• ▫️ ${l.nombre} — ${previsto}`;
+  const distinto = l.real !== null && l.real !== l.previsto;
+  const reservado = distinto && l.previsto !== null ? ` (reservado ${$(l.previsto)})` : "";
+  const vence = l.vencimiento && !l.vencimiento.pagado ? ` · vence ${diaMes(l.vencimiento.fecha)}` : "";
+  return `• ${distinto ? "✏️ " : ""}${l.nombre} — ${$(l.monto)}${reservado}${vence}`;
 }
 
 /** Cómo armar o cambiar las cuentas con /cuentas (sin IA). */
@@ -285,7 +275,8 @@ export const TEXTO_COMO_ARMAR = [
   "Seguro 110000 (vencimiento Seguro auto)",
   "",
   "• El sueldo (o lo que diga ingreso) va como ingreso.",
-  "• (vencimiento X) lo vincula a ese vencimiento: lo gastado pasa a ser lo que pagues ahí. Sin eso, la reserva va por su lado.",
+  "• Lo reservado cuenta como gastado. Si un mes fue distinto, tocá ✏️ Este mes fue distinto.",
+  "• (vencimiento X) lo vincula a ese vencimiento: cuando lo pagues, cuenta lo pagado. Sin eso, va por su lado.",
   "• (sin vincular) lo separa · quitar Nafta lo saca.",
   "• Si el rubro ya existe, le cambia el monto.",
   "",
@@ -294,28 +285,18 @@ export const TEXTO_COMO_ARMAR = [
 
 export const TEXTO_SIN_CUENTAS = `Todavía no armaste tus cuentas.\n\n${TEXTO_COMO_ARMAR}`;
 
-export function textoCuentas(c: CuentasDelMes, hoy = hoyISO()): string {
+export function textoCuentas(c: CuentasDelMes): string {
   const titulo = `📒 Cuentas de ${formatoPeriodoAR(c.periodo)}`;
   if (c.gastos.length + c.ingresos.length === 0) return `${titulo}\n\n${TEXTO_SIN_CUENTAS}`;
   const t = c.totales;
-  const pasado = c.periodo < hoy.slice(0, 7);
   const lineas = [titulo, ""];
-  for (const i of c.ingresos)
-    lineas.push(`💵 ${i.nombre} — ${$(i.real ?? i.previsto ?? 0)}${i.real === null ? " (previsto)" : ""}`);
-  lineas.push(`🧾 Gastos previstos — ${$(t.previsto)}`);
-  if (c.ingresos.length > 0) lineas.push(`💰 Sobra — ${$(t.sobraPrevista)}`);
-  lineas.push(
-    "",
-    `${pasado ? "Cómo terminó" : "Con lo cargado hasta ahora"}:`,
-    `✅ Gastado — ${$(t.gastado)} de ${$(t.previsto)}`,
-  );
-  if (c.ingresos.length > 0 && t.proyectado !== t.gastado) {
-    lineas.push(`💰 Sobraría — ${$(t.sobraProyectada)} (con lo previsto en lo que falta)`);
-  } else if (c.ingresos.length > 0) {
-    lineas.push(`💰 Sobra — ${$(t.sobraProyectada)}`);
-  }
+  for (const i of c.ingresos) lineas.push(`💵 ${i.nombre} — ${$(i.monto)}`);
+  lineas.push(`🧾 Gastos — ${$(t.gastos)}`);
+  if (c.ingresos.length > 0) lineas.push(`💰 Sobra — ${$(t.sobra)}`);
   lineas.push("", ...c.gastos.map(lineaCuenta));
-  lineas.push("", "✅ cargado o pagado · 🕓 vence · ▫️ todavía previsto");
+  if ([...c.gastos, ...c.ingresos].some((l) => l.real !== null && l.real !== l.previsto)) {
+    lineas.push("", "✏️ = este mes fue distinto a lo reservado");
+  }
   return lineas.join("\n");
 }
 
@@ -334,8 +315,8 @@ export function textoConfigurar(r: ResultadoConfigurar): string {
   if (r.accion === "quitado") return `Listo, saqué ${r.nombre} de tus cuentas. Lo ya cargado queda guardado.`;
   const tipo = r.tipo === "ingreso" ? "💵 ingreso" : "🧾 gasto";
   return [
-    `${r.accion === "creado" ? "Agregué" : "Actualicé"} ${r.nombre} (${tipo})${r.previsto ? ` — previsto ${formatoARS(r.previsto)} por mes` : ""}.`,
-    r.vinculadoA ? `🔗 Vinculado al vencimiento ${r.vinculadoA}: lo real es lo que pagues ahí.` : null,
+    `${r.accion === "creado" ? "Agregué" : "Actualicé"} ${r.nombre} (${tipo})${r.previsto ? ` — reservado ${formatoARS(r.previsto)} por mes` : ""}.`,
+    r.vinculadoA ? `🔗 Vinculado al vencimiento ${r.vinculadoA}: cuando lo pagues, cuenta lo pagado.` : null,
     r.vencimientoNoEncontrado
       ? `⚠️ No encontré el vencimiento ${r.vencimientoNoEncontrado}: quedó sin vincular, como reserva aparte.`
       : null,

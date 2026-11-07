@@ -2,6 +2,16 @@
 
 Versionado semántico (`MAJOR.MINOR.PATCH`) aplicado sobre este proyecto: **MAJOR** = etapa nueva (módulo o capacidad significativa), **MINOR** = funcionalidad menor agregada entre etapas, **PATCH** = fix o cambio de infraestructura sin funcionalidad nueva. Cada versión tiene un tag de Git con el mismo nombre (`vX.Y.Z`).
 
+## [9.13.1] — 2026-11-07 — Lo reservado cuenta como gastado
+> 🧾 En las cuentas, lo reservado de cada rubro ya cuenta como gasto: sueldo − gastos = sobra
+> ✏️ Si un mes fue distinto, se modifica solo ese rubro ("✏️ Este mes fue distinto")
+> 📅 El botón "Hoy" de las cargas guardaba la fecha de mañana después de las 21 h
+
+Las cuentas dejan de seguir "lo gastado hasta ahora": cada rubro cuenta lo reservado, salvo el mes que
+se modifique (marcado ✏️ en Telegram y en amarillo en la planilla, con lo reservado al lado). El flujo
+📒 Cuenta del mes ofrece todos los rubros, también el sueldo y los vinculados. El botón "Hoy" de los
+flujos usaba la fecha UTC en vez de la de Argentina.
+
 ## [9.13.0] — 2026-11-06 — Cuentas personales
 > 📒 Tu presupuesto del mes en el bot: rubros con lo previsto, el sueldo y cuánto sobra
 > ⚙️ Se arman sin gastar IA: /cuentas con la lista, o el botón ⚙️ Rubros

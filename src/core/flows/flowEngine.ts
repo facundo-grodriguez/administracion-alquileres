@@ -1,3 +1,4 @@
+import { hoyISO } from "../util/fecha.js";
 import { FLUJOS } from "./definiciones/index.js";
 import { esInterrupcion } from "./detectarInterrupcion.js";
 import type {
@@ -369,7 +370,7 @@ export async function procesarSeleccion(
   }
 
   if (accion === CALLBACK_HOY && paso.campo.tipo === "fecha" && paso.campo.permitirHoy) {
-    frame.datos[paso.id] = new Date().toISOString().slice(0, 10);
+    frame.datos[paso.id] = hoyISO(); // fecha de Argentina, no UTC (después de las 21 h daba mañana)
     return siguientePaso(estado, registro);
   }
 

@@ -222,11 +222,12 @@ async function personales(hoy: string): Promise<Pestana> {
   };
 }
 
-const LEYENDA_CUENTAS = "🟩 ya cargado o pagado   sin color: lo previsto";
+const LEYENDA_CUENTAS = "🟨 ese mes fue distinto a lo reservado   sin color: lo reservado";
 
 /**
  * "Cuentas" (v9.13.0): el presupuesto personal como lo anota el administrador. Una fila por rubro y
- * una columna por mes (el más nuevo a la izquierda): lo real si ya se sabe (en verde) o lo previsto.
+ * una columna por mes (el más nuevo a la izquierda): lo reservado o, si ese mes fue distinto, lo
+ * modificado (en amarillo).
  * Abajo, el total de gastos, el sueldo y lo que sobra.
  */
 async function cuentas(hoy: string): Promise<Pestana> {
@@ -254,8 +255,8 @@ async function cuentas(hoy: string): Promise<Pestana> {
     const colores: (Color | null)[] = [null];
     for (const c of porMes) {
       const l = [...c.gastos, ...c.ingresos].find((x) => x.rubroId === id);
-      valores.push(l ? (l.real ?? l.previsto) : null);
-      colores.push(l?.real !== null && l?.real !== undefined ? COLORES.pagado : null);
+      valores.push(l ? l.monto : null);
+      colores.push(l && l.real !== null && l.real !== l.previsto ? COLORES.pendiente : null);
     }
     filas.push(valores);
     fondos.push(colores);
@@ -264,12 +265,12 @@ async function cuentas(hoy: string): Promise<Pestana> {
   const negritas: number[] = [];
   filas.push([]);
   negritas.push(filas.length);
-  filas.push(["Total gastos", ...porMes.map((c) => c.totales.proyectado)]);
+  filas.push(["Total gastos", ...porMes.map((c) => c.totales.gastos)]);
   filas.push([]);
   for (const [id, r] of rubros) if (r.tipo === "ingreso") fila(id);
   if (porMes.some((c) => c.ingresos.length > 0)) {
     negritas.push(filas.length);
-    filas.push(["Sobra", ...porMes.map((c) => c.totales.sobraProyectada)]);
+    filas.push(["Sobra", ...porMes.map((c) => c.totales.sobra)]);
   }
   filas.push([], [LEYENDA_CUENTAS]);
   return { titulo: PESTANAS.cuentas, columnas, filas, fondos, negritas, columnasFijas: 1, sinFiltro: true };
